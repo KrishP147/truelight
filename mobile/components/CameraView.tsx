@@ -1,8 +1,8 @@
 /**
  * CameraView Component
  *
- * Captures camera frames and sends them to the backend for analysis.
- * Optimized for real-time traffic signal detection.
+ * Minimalist camera detection screen
+ * Only the signal state text shows color (red/yellow/green)
  */
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
@@ -36,33 +36,27 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
   const [isProcessing, setIsProcessing] = useState(false);
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Capture and analyze a frame
   const captureFrame = useCallback(async () => {
     if (!cameraRef.current || isProcessing || !isCapturing) return;
 
     try {
       setIsProcessing(true);
 
-      // Capture a photo with reduced quality for faster upload
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
         quality: 0.3,
         skipProcessing: true,
-        shutterSound: false, // Disable shutter sound
+        shutterSound: false,
       });
 
       if (!photo?.base64) {
         throw new Error("Failed to capture image");
       }
 
-      // Send to backend for analysis
       const result: DetectionResponse = await detectSignal(photo.base64);
-
-      // Update state
       setCurrentState(result.state);
       setConfidence(result.confidence);
 
-      // Speak the result if confidence is high enough
       if (result.confidence >= TIMING.minConfidenceToAnnounce) {
         await speakSignalState(result.state, colorblindType);
       }
@@ -74,7 +68,6 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
     }
   }, [isProcessing, isCapturing, colorblindType, onError]);
 
-  // Start/stop capture interval
   useEffect(() => {
     if (isCapturing && permission?.granted) {
       resetSpeechState();
@@ -92,7 +85,7 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
     };
   }, [isCapturing, permission?.granted, captureFrame]);
 
-  // Get display info based on state
+  // Get color for detected state text only
   const getStateColor = () => {
     switch (currentState) {
       case "red":
@@ -102,20 +95,20 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
       case "green":
         return COLORS.green;
       default:
-        return COLORS.unknown;
+        return COLORS.textSecondary;
     }
   };
 
   const getStateLabel = () => {
     switch (currentState) {
       case "red":
-        return "RED";
+        return "Red";
       case "yellow":
-        return "YELLOW";
+        return "Yellow";
       case "green":
-        return "GREEN";
+        return "Green";
       default:
-        return "SCANNING";
+        return "Scanning";
     }
   };
 
@@ -126,11 +119,13 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
     return getSignalMessage(currentState, colorblindType);
   };
 
-  // Handle permissions
+  // Permission states
   if (!permission) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Checking camera permission...</Text>
+        <View style={styles.centerContent}>
+          <Text style={styles.message}>Checking camera permission...</Text>
+        </View>
       </View>
     );
   }
@@ -138,59 +133,51 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>
-          Delta needs camera access to detect traffic signals and help keep you
-          safe.
-        </Text>
-        <Pressable
-          style={styles.permissionButton}
-          onPress={requestPermission}
-          accessibilityRole="button"
-          accessibilityLabel="Grant camera permission"
-        >
-          <Text style={styles.permissionButtonText}>Enable Camera</Text>
-        </Pressable>
+        <View style={styles.centerContent}>
+          <Text style={styles.title}>Camera Access</Text>
+          <Text style={styles.message}>
+            Delta needs camera access to detect traffic signals.
+          </Text>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={requestPermission}
+            accessibilityRole="button"
+            accessibilityLabel="Grant camera permission"
+          >
+            <Text style={styles.primaryButtonText}>Enable Camera</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
-  const stateColor = getStateColor();
-
   return (
     <View style={styles.container}>
-      {/* Status bar at top */}
-      <View style={styles.statusContainer}>
-        {/* State indicator */}
-        <View style={[styles.stateIndicator, { backgroundColor: stateColor }]}>
-          <Text style={styles.stateText}>{getStateLabel()}</Text>
-        </View>
-
-        {/* Action description */}
-        <View style={[styles.actionBar, { borderColor: stateColor }]}>
-          <Text style={styles.actionText}>{getActionText()}</Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.stateText, { color: getStateColor() }]}>
+          {getStateLabel()}
+        </Text>
+        <Text style={styles.actionText}>{getActionText()}</Text>
       </View>
 
-      {/* Camera preview - takes most of the screen */}
+      {/* Camera */}
       <View style={styles.cameraContainer}>
         <ExpoCameraView ref={cameraRef} style={styles.camera} facing="back">
-          {/* Processing indicator */}
           {isProcessing && (
             <View style={styles.processingIndicator}>
-              <View
-                style={[styles.processingDot, { backgroundColor: stateColor }]}
-              />
+              <View style={styles.processingDot} />
             </View>
           )}
         </ExpoCameraView>
       </View>
 
-      {/* Bottom controls */}
-      <View style={styles.bottomBar}>
+      {/* Controls */}
+      <View style={styles.footer}>
         <Pressable
           style={[
             styles.controlButton,
-            !isCapturing && styles.controlButtonPaused,
+            !isCapturing && styles.controlButtonActive,
           ]}
           onPress={() => setIsCapturing(!isCapturing)}
           accessibilityRole="button"
@@ -198,8 +185,13 @@ export function CameraViewComponent({ colorblindType, onError }: Props) {
             isCapturing ? "Pause detection" : "Resume detection"
           }
         >
-          <Text style={styles.controlButtonText}>
-            {isCapturing ? "PAUSE" : "RESUME"}
+          <Text
+            style={[
+              styles.controlButtonText,
+              !isCapturing && styles.controlButtonTextActive,
+            ]}
+          >
+            {isCapturing ? "Pause" : "Resume"}
           </Text>
         </Pressable>
       </View>
@@ -212,97 +204,96 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  statusContainer: {
-    paddingTop: 60, // Account for status bar / notch
-    paddingHorizontal: SIZES.spacingMedium,
-    paddingBottom: SIZES.spacingMedium,
-    backgroundColor: COLORS.background,
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: SIZES.spacingLarge,
   },
-  stateIndicator: {
-    alignSelf: "center",
-    paddingHorizontal: SIZES.spacingLarge * 2,
-    paddingVertical: SIZES.spacingMedium,
-    borderRadius: SIZES.borderRadius,
-    marginBottom: SIZES.spacingSmall,
+  header: {
+    paddingTop: 70,
+    paddingHorizontal: SIZES.spacingLarge,
+    paddingBottom: SIZES.spacingMedium,
   },
   stateText: {
-    color: COLORS.background,
     fontSize: SIZES.textXL,
-    fontWeight: "bold",
-    letterSpacing: 4,
-    textAlign: "center",
-  },
-  actionBar: {
-    backgroundColor: COLORS.backgroundSecondary,
-    paddingVertical: SIZES.spacingMedium,
-    paddingHorizontal: SIZES.spacingLarge,
-    borderRadius: SIZES.borderRadius,
-    borderWidth: 2,
+    fontWeight: "600",
+    letterSpacing: -1,
+    marginBottom: 4,
   },
   actionText: {
-    color: COLORS.textPrimary,
     fontSize: SIZES.textMedium,
-    textAlign: "center",
-    fontWeight: "500",
+    color: COLORS.textSecondary,
   },
   cameraContainer: {
     flex: 1,
-    overflow: "hidden",
-    marginHorizontal: SIZES.spacingMedium,
+    marginHorizontal: SIZES.spacingLarge,
+    marginBottom: SIZES.spacingMedium,
     borderRadius: SIZES.borderRadius,
+    overflow: "hidden",
+    backgroundColor: COLORS.textPrimary,
   },
   camera: {
     flex: 1,
   },
   processingIndicator: {
     position: "absolute",
-    top: 16,
-    right: 16,
+    top: SIZES.spacingMedium,
+    right: SIZES.spacingMedium,
   },
   processingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    opacity: 0.9,
-  },
-  bottomBar: {
-    paddingVertical: SIZES.spacingMedium,
-    paddingHorizontal: SIZES.spacingMedium,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: COLORS.background,
+    opacity: 0.8,
+  },
+  footer: {
+    paddingHorizontal: SIZES.spacingLarge,
+    paddingBottom: SIZES.spacingLarge,
   },
   controlButton: {
-    alignSelf: "center",
-    backgroundColor: COLORS.buttonBackground,
-    paddingHorizontal: SIZES.spacingLarge * 2,
-    paddingVertical: SIZES.spacingMedium,
+    backgroundColor: COLORS.backgroundSecondary,
+    paddingVertical: SIZES.buttonPadding,
     borderRadius: SIZES.borderRadius,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  controlButtonPaused: {
-    backgroundColor: COLORS.green,
+  controlButtonActive: {
+    backgroundColor: COLORS.buttonBackground,
+    borderColor: COLORS.buttonBackground,
   },
   controlButtonText: {
     color: COLORS.textPrimary,
-    fontSize: SIZES.textSmall,
-    fontWeight: "bold",
+    fontSize: SIZES.textMedium,
+    fontWeight: "500",
+  },
+  controlButtonTextActive: {
+    color: COLORS.buttonText,
+  },
+  title: {
+    fontSize: SIZES.textLarge,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.spacingSmall,
   },
   message: {
-    color: COLORS.textPrimary,
     fontSize: SIZES.textMedium,
+    color: COLORS.textSecondary,
     textAlign: "center",
-    marginHorizontal: SIZES.spacingLarge,
     marginBottom: SIZES.spacingLarge,
-    marginTop: 100,
+    lineHeight: 26,
   },
-  permissionButton: {
-    alignSelf: "center",
-    backgroundColor: COLORS.green,
-    paddingHorizontal: SIZES.spacingLarge,
+  primaryButton: {
+    backgroundColor: COLORS.buttonBackground,
     paddingVertical: SIZES.buttonPadding,
+    paddingHorizontal: SIZES.spacingLarge * 2,
     borderRadius: SIZES.borderRadius,
   },
-  permissionButtonText: {
-    color: COLORS.textPrimary,
+  primaryButtonText: {
+    color: COLORS.buttonText,
     fontSize: SIZES.textMedium,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
 });

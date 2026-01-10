@@ -82,7 +82,7 @@ function tryPlaceCircle(
     for (const existing of existingCircles) {
       const dist = Math.sqrt(
         (x - existing.x - existing.size / 2) ** 2 +
-        (y - existing.y - existing.size / 2) ** 2,
+          (y - existing.y - existing.size / 2) ** 2,
       );
       const minDist = (size + existing.size) / 2 + 2; // 2px gap
       if (dist < minDist) {
@@ -241,7 +241,15 @@ function getNumberPattern(answer: string): (x: number, y: number) => boolean {
       const in9Circle = dist9 > 0.05 && dist9 < 0.18;
       const in9Tail = x > 0.75 && x < 0.88 && y > 0.32 && y < 0.78;
 
-      return in2Top || in2Right || in2Mid || in2Left || in2Bot || in9Circle || in9Tail;
+      return (
+        in2Top ||
+        in2Right ||
+        in2Mid ||
+        in2Left ||
+        in2Bot ||
+        in9Circle ||
+        in9Tail
+      );
     },
 
     "70": (x, y) => {
@@ -299,7 +307,16 @@ function getNumberPattern(answer: string): (x: number, y: number) => boolean {
       const in5RightBot = x > 0.75 && x < 0.88 && y > 0.48 && y < 0.78;
       const in5Bot = y > 0.65 && y < 0.78 && x > 0.52 && x < 0.88;
 
-      return in4Left || in4Mid || in4Right || in5Top || in5LeftTop || in5Mid || in5RightBot || in5Bot;
+      return (
+        in4Left ||
+        in4Mid ||
+        in4Right ||
+        in5Top ||
+        in5LeftTop ||
+        in5Mid ||
+        in5RightBot ||
+        in5Bot
+      );
     },
 
     "6": (x, y) => {
@@ -341,7 +358,16 @@ function getNumberPattern(answer: string): (x: number, y: number) => boolean {
       const in2LeftBot = x > 0.52 && x < 0.65 && y > 0.48 && y < 0.78;
       const in2Bot = y > 0.65 && y < 0.78 && x > 0.52 && x < 0.88;
 
-      return in4Left || in4Mid || in4Right || in2Top || in2RightTop || in2Mid || in2LeftBot || in2Bot;
+      return (
+        in4Left ||
+        in4Mid ||
+        in4Right ||
+        in2Top ||
+        in2RightTop ||
+        in2Mid ||
+        in2LeftBot ||
+        in2Bot
+      );
     },
 
     "97": (x, y) => {
@@ -375,6 +401,88 @@ function getNumberPattern(answer: string): (x: number, y: number) => boolean {
       const inCircle = dist > 0.06 && dist < 0.2;
       const inTail = x > 0.58 && x < 0.72 && y > 0.32 && y < 0.78;
       return inCircle || inTail;
+    },
+
+    "57": (x, y) => {
+      // "5" on left
+      const in5Top = y > 0.22 && y < 0.35 && x > 0.12 && x < 0.45;
+      const in5LeftTop = x > 0.12 && x < 0.25 && y > 0.22 && y < 0.52;
+      const in5Mid = y > 0.42 && y < 0.55 && x > 0.12 && x < 0.45;
+      const in5RightBot = x > 0.32 && x < 0.45 && y > 0.48 && y < 0.78;
+      const in5Bot = y > 0.65 && y < 0.78 && x > 0.12 && x < 0.45;
+
+      // "7" on right
+      const in7Top = x > 0.52 && x < 0.88 && y > 0.22 && y < 0.35;
+      const in7Stem = x > 0.65 && x < 0.78 && y > 0.22 && y < 0.78;
+
+      return (
+        in5Top ||
+        in5LeftTop ||
+        in5Mid ||
+        in5RightBot ||
+        in5Bot ||
+        in7Top ||
+        in7Stem
+      );
+    },
+
+    "35": (x, y) => {
+      // "3" on left
+      const in3Top = y > 0.22 && y < 0.35 && x > 0.12 && x < 0.45;
+      const in3Mid = y > 0.42 && y < 0.55 && x > 0.12 && x < 0.45;
+      const in3Bot = y > 0.65 && y < 0.78 && x > 0.12 && x < 0.45;
+      const in3Right = x > 0.32 && x < 0.45 && y > 0.22 && y < 0.78;
+
+      // "5" on right
+      const in5Top = y > 0.22 && y < 0.35 && x > 0.52 && x < 0.88;
+      const in5LeftTop = x > 0.52 && x < 0.65 && y > 0.22 && y < 0.52;
+      const in5Mid = y > 0.42 && y < 0.55 && x > 0.52 && x < 0.88;
+      const in5RightBot = x > 0.75 && x < 0.88 && y > 0.48 && y < 0.78;
+      const in5Bot = y > 0.65 && y < 0.78 && x > 0.52 && x < 0.88;
+
+      return (
+        in3Top ||
+        in3Mid ||
+        in3Bot ||
+        in3Right ||
+        in5Top ||
+        in5LeftTop ||
+        in5Mid ||
+        in5RightBot ||
+        in5Bot
+      );
+    },
+
+    "15": (x, y) => {
+      // "1" on left
+      const in1 = x > 0.15 && x < 0.35 && y > 0.22 && y < 0.78;
+
+      // "5" on right
+      const in5Top = y > 0.22 && y < 0.35 && x > 0.48 && x < 0.85;
+      const in5LeftTop = x > 0.48 && x < 0.62 && y > 0.22 && y < 0.52;
+      const in5Mid = y > 0.42 && y < 0.55 && x > 0.48 && x < 0.85;
+      const in5RightBot = x > 0.72 && x < 0.85 && y > 0.48 && y < 0.78;
+      const in5Bot = y > 0.65 && y < 0.78 && x > 0.48 && x < 0.85;
+
+      return in1 || in5Top || in5LeftTop || in5Mid || in5RightBot || in5Bot;
+    },
+
+    "17": (x, y) => {
+      // "1" on left
+      const in1 = x > 0.15 && x < 0.35 && y > 0.22 && y < 0.78;
+
+      // "7" on right
+      const in7Top = x > 0.48 && x < 0.85 && y > 0.22 && y < 0.35;
+      const in7Stem = x > 0.62 && x < 0.75 && y > 0.22 && y < 0.78;
+
+      return in1 || in7Top || in7Stem;
+    },
+
+    "7": (x, y) => {
+      // Single "7" centered
+      const inTop = x > 0.28 && x < 0.72 && y > 0.22 && y < 0.35;
+      const inStem = x > 0.45 && x < 0.58 && y > 0.22 && y < 0.78;
+      return inTop || inStem;
     },
   };
 

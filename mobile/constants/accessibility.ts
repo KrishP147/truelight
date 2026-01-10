@@ -1,52 +1,49 @@
 /**
  * Accessibility Constants
  *
- * ACCESSIBILITY DECISIONS:
- * - High contrast colors (WCAG AAA compliant)
- * - Large touch targets (minimum 48dp)
- * - Clear, simple text
- * - Dark background to reduce eye strain and improve camera visibility
- * - Colorblindness-aware feedback based on user's vision type
+ * Minimalist design inspired by tomalmog.com and claudetempo.vercel.app
+ * Clean white backgrounds, dark text, generous spacing
  */
 
 export const COLORS = {
-  // Background - dark for high contrast and reduced eye strain
-  background: "#000000",
-  backgroundSecondary: "#1A1A1A",
+  // Background - clean white/light gray
+  background: "#FAFBFC",
+  backgroundSecondary: "#F3F4F6",
 
-  // Signal state colors - high saturation for visibility
-  red: "#FF3B30",
-  yellow: "#FFD60A",
-  green: "#30D158",
-  unknown: "#8E8E93",
+  // Signal state colors - only used when displaying detection results
+  red: "#EF4444",
+  yellow: "#F59E0B",
+  green: "#10B981",
+  unknown: "#9CA3AF",
 
-  // Text - high contrast
-  textPrimary: "#FFFFFF",
-  textSecondary: "#AEAEB2",
+  // Text - dark for readability
+  textPrimary: "#1A1A1A",
+  textSecondary: "#6B7280",
 
   // UI elements
-  border: "#38383A",
-  buttonBackground: "#2C2C2E",
+  border: "#E5E7EB",
+  buttonBackground: "#1A1A1A",
+  buttonText: "#FFFFFF",
 };
 
 export const SIZES = {
-  // Large text for readability
-  textXL: 48,
-  textLarge: 32,
-  textMedium: 24,
-  textSmall: 18,
+  // Text sizes - clean hierarchy
+  textXL: 42,
+  textLarge: 28,
+  textMedium: 18,
+  textSmall: 15,
 
   // Touch targets - minimum 48dp for accessibility
-  touchTarget: 56,
-  buttonPadding: 20,
+  touchTarget: 48,
+  buttonPadding: 16,
 
-  // Spacing
+  // Spacing - generous for minimalist feel
   spacingLarge: 32,
   spacingMedium: 16,
   spacingSmall: 8,
 
-  // Border radius
-  borderRadius: 16,
+  // Border radius - subtle
+  borderRadius: 12,
 };
 
 export const TIMING = {

@@ -1,20 +1,15 @@
 /**
  * Color Vision Test Screen
  *
- * A simplified Ishihara-style test with multiple choice answers.
- * Shows colored circle patterns forming numbers.
- *
- * ACCESSIBILITY:
- * - Large, tappable option buttons
- * - Clear progress indication
- * - No typing required
+ * Ishihara-style test that determines colorblindness type
+ * Returns to main page with result selected
  */
 
 import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { COLORS, SIZES } from "../constants/accessibility";
+import { COLORS, SIZES, ColorblindnessType } from "../constants/accessibility";
 import {
   TEST_PLATES,
   QUICK_TEST_PLATE_IDS,
@@ -29,8 +24,9 @@ export default function ColorTestScreen() {
   const router = useRouter();
   const [currentPlateIndex, setCurrentPlateIndex] = useState(0);
   const [responses, setResponses] = useState<TestResponse[]>([]);
+  const [testComplete, setTestComplete] = useState(false);
+  const [resultType, setResultType] = useState<ColorblindnessType>("unknown");
 
-  // Use 10-plate test for comprehensive onboarding
   const testPlates = QUICK_TEST_PLATE_IDS.map(
     (id) => TEST_PLATES.find((p) => p.id === id)!,
   );
@@ -38,7 +34,6 @@ export default function ColorTestScreen() {
   const isLastPlate = currentPlateIndex === testPlates.length - 1;
   const progress = ((currentPlateIndex + 1) / testPlates.length) * 100;
 
-  // Shuffle function for randomizing answer order
   const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -48,14 +43,12 @@ export default function ColorTestScreen() {
     return shuffled;
   };
 
-  // Randomize options for current plate (memoized so it doesn't change on re-render)
   const shuffledOptions = useMemo(
     () => shuffleArray(currentPlate.options),
-    [currentPlate.id]
+    [currentPlate.id],
   );
 
   const handleSelectOption = (option: string) => {
-    // Record response
     const newResponses: TestResponse[] = [
       ...responses,
       { plateId: currentPlate.id, answer: option },
@@ -63,10 +56,8 @@ export default function ColorTestScreen() {
     setResponses(newResponses);
 
     if (isLastPlate) {
-      // Analyze results and navigate
       finishTest(newResponses);
     } else {
-      // Move to next plate
       setCurrentPlateIndex(currentPlateIndex + 1);
       speak(`Plate ${currentPlateIndex + 2} of ${testPlates.length}`);
     }
@@ -79,36 +70,78 @@ export default function ColorTestScreen() {
     setColorblindType(result.type);
     completeOnboarding();
 
-    // Announce result
-    speak(result.description);
+    // Show result screen
+    setResultType(result.type);
+    setTestComplete(true);
 
-    // Navigate to camera
-    router.replace("/camera");
+    // Announce result
+    speak(`Test complete. ${result.description}`);
   };
 
+  const handleContinue = () => {
+    router.replace("/");
+  };
+
+  // Result screen
+  if (testComplete) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.resultContent}>
+          <Text style={styles.resultTitle}>Test Complete</Text>
+
+          <View style={styles.resultCard}>
+            <Text style={styles.resultLabel}>Your vision type</Text>
+            <Text style={styles.resultValue}>
+              {getVisionTypeLabel(resultType)}
+            </Text>
+            <Text style={styles.resultDescription}>
+              {getVisionTypeDescription(resultType)}
+            </Text>
+          </View>
+
+          <Text style={styles.resultNote}>
+            This has been saved. You can change it anytime from the main screen.
+          </Text>
+
+          <Pressable
+            style={styles.primaryButton}
+            onPress={handleContinue}
+            accessibilityRole="button"
+            accessibilityLabel="Continue to main screen"
+          >
+            <Text style={styles.primaryButtonText}>Continue</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Test screen
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Progress bar */}
-        <View style={styles.progressContainer}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.stepText}>
+            {currentPlateIndex + 1} of {testPlates.length}
+          </Text>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
-          <Text style={styles.progressText}>
-            {currentPlateIndex + 1} of {testPlates.length}
-          </Text>
         </View>
 
         {/* Question */}
         <Text style={styles.question}>What number do you see?</Text>
 
-        {/* Ishihara plate with colored circles */}
-        <ColorTestPlate plate={currentPlate} />
+        {/* Ishihara plate */}
+        <View style={styles.plateContainer}>
+          <ColorTestPlate plate={currentPlate} />
+        </View>
 
-        {/* Multiple choice options - randomized */}
+        {/* Options */}
         <View style={styles.optionsContainer}>
           {shuffledOptions.map((option, index) => (
             <Pressable
@@ -127,6 +160,40 @@ export default function ColorTestScreen() {
   );
 }
 
+function getVisionTypeLabel(type: ColorblindnessType): string {
+  switch (type) {
+    case "normal":
+      return "Normal Vision";
+    case "protanopia":
+      return "Protanopia";
+    case "deuteranopia":
+      return "Deuteranopia";
+    case "tritanopia":
+      return "Tritanopia";
+    case "low_vision":
+      return "Low Vision";
+    default:
+      return "Unknown";
+  }
+}
+
+function getVisionTypeDescription(type: ColorblindnessType): string {
+  switch (type) {
+    case "normal":
+      return "You have normal color vision. The app will use standard audio cues.";
+    case "protanopia":
+      return "You have difficulty seeing red colors. The app will include position cues in announcements.";
+    case "deuteranopia":
+      return "You have difficulty seeing green colors. The app will include position cues in announcements.";
+    case "tritanopia":
+      return "You have difficulty with blue and yellow colors. The app will include position cues in announcements.";
+    case "low_vision":
+      return "The app will use full audio descriptions with position cues.";
+    default:
+      return "The app will adapt to help you navigate traffic signals.";
+  }
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -135,40 +202,39 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: SIZES.spacingLarge,
-    alignItems: "center",
+    paddingTop: 60,
   },
-  progressContainer: {
-    width: "100%",
-    marginBottom: SIZES.spacingMedium,
+  header: {
+    marginBottom: SIZES.spacingLarge,
+  },
+  stepText: {
+    fontSize: SIZES.textSmall,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.spacingSmall,
   },
   progressBar: {
     width: "100%",
-    height: 8,
-    backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: 4,
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: COLORS.green,
-    borderRadius: 4,
-  },
-  progressText: {
-    color: COLORS.textSecondary,
-    fontSize: SIZES.textSmall,
-    textAlign: "center",
-    marginTop: 8,
+    backgroundColor: COLORS.textPrimary,
+    borderRadius: 2,
   },
   question: {
     fontSize: SIZES.textLarge,
-    fontWeight: "bold",
+    fontWeight: "600",
     color: COLORS.textPrimary,
-    textAlign: "center",
-    marginBottom: SIZES.spacingSmall,
+    marginBottom: SIZES.spacingLarge,
+  },
+  plateContainer: {
+    alignItems: "center",
+    marginBottom: SIZES.spacingLarge,
   },
   optionsContainer: {
-    width: "100%",
-    marginTop: SIZES.spacingMedium,
     gap: SIZES.spacingSmall,
   },
   optionButton: {
@@ -176,13 +242,67 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.buttonPadding,
     paddingHorizontal: SIZES.spacingLarge,
     borderRadius: SIZES.borderRadius,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: "center",
   },
   optionText: {
     color: COLORS.textPrimary,
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: SIZES.textLarge,
+    fontWeight: "600",
+  },
+  // Result screen styles
+  resultContent: {
+    flex: 1,
+    padding: SIZES.spacingLarge,
+    paddingTop: 100,
+  },
+  resultTitle: {
+    fontSize: SIZES.textXL,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.spacingLarge * 1.5,
+    letterSpacing: -1,
+  },
+  resultCard: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: SIZES.borderRadius,
+    padding: SIZES.spacingLarge,
+    marginBottom: SIZES.spacingLarge,
+  },
+  resultLabel: {
+    fontSize: SIZES.textSmall,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  resultValue: {
+    fontSize: SIZES.textLarge,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.spacingSmall,
+  },
+  resultDescription: {
+    fontSize: SIZES.textSmall,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
+  resultNote: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginBottom: SIZES.spacingLarge * 2,
+    opacity: 0.7,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.buttonBackground,
+    paddingVertical: SIZES.buttonPadding,
+    paddingHorizontal: SIZES.spacingLarge,
+    borderRadius: SIZES.borderRadius,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: COLORS.buttonText,
+    fontSize: SIZES.textMedium,
+    fontWeight: "600",
   },
 });
