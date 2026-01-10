@@ -76,7 +76,8 @@ npm run android
 - **expo-location**: GPS for speed detection
 - **react-navigation**: Screen navigation
 - **react-native-svg**: Ishihara test rendering
-- **TensorFlow Lite** (planned): Object detection model
+
+Note: TensorFlow Lite integration is planned for production implementation. Current version uses simulated hazard detection for demonstration purposes.
 
 ## Production Implementation Notes
 

@@ -98,7 +98,7 @@ export default function CalibrationScreen({ onCalibrationComplete }) {
       const answer = userAnswer.answer.toLowerCase();
       
       if (answer === test.protanopia.toLowerCase()) protanopiaScore++;
-      if (answer === test.deuteranopiaScore.toLowerCase()) deuteranopiaScore++;
+      if (answer === test.deuteranopia.toLowerCase()) deuteranopiaScore++;
       if (answer === test.tritanopia.toLowerCase()) tritanopiaScore++;
       if (answer === test.normalVision.toLowerCase()) normalScore++;
     });
