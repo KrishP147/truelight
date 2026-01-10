@@ -32,13 +32,13 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         >
-          <Stack.Screen
-            name="index"
-            options={{
-              title: 'Delta',
-              headerShown: false,
-            }}
-          />
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'True Light',
+            headerShown: false,
+          }}
+        />
           <Stack.Screen
             name="login"
             options={{
@@ -62,13 +62,13 @@ export default function RootLayout() {
               headerBackTitle: 'Back',
             }}
           />
-          <Stack.Screen
-            name="camera"
-            options={{
-              title: 'Delta',
-              headerShown: false,
-            }}
-          />
+        <Stack.Screen
+          name="camera"
+          options={{
+            title: 'True Light',
+            headerShown: false,
+          }}
+        />
         </Stack>
       </View>
     </AuthProvider>

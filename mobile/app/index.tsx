@@ -103,9 +103,9 @@ export default function WelcomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title} accessibilityRole="header">
-            DELTA
+            True Light
           </Text>
-          <Text style={styles.subtitle}>Traffic Signal Assistant</Text>
+          <Text style={styles.subtitle}>Color Assistant</Text>
 
           {user && (
             <View style={styles.userCard}>
@@ -160,13 +160,13 @@ export default function WelcomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title} accessibilityRole="header">
-          DELTA
+          True Light
         </Text>
-        <Text style={styles.subtitle}>Traffic Signal Assistant</Text>
+        <Text style={styles.subtitle}>Color Assistant</Text>
 
         <View style={styles.descriptionCard}>
           <Text style={styles.description}>
-            Delta helps you navigate traffic signals safely by detecting lights
+            True Light helps you navigate traffic signals safely by detecting lights
             and providing clear audio feedback.
           </Text>
           <Text style={styles.description}>
@@ -265,23 +265,29 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textSmall,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingSmall / 2,
+    textAlign: "center",
   },
   userValue: {
     fontSize: SIZES.textMedium,
     fontWeight: "bold",
     color: COLORS.green,
+    textAlign: "center",
   },
   title: {
-    fontSize: SIZES.textXL + 16,
-    fontWeight: "bold",
+    fontSize: SIZES.textXL + 20,
+    fontWeight: "800",
     color: COLORS.textPrimary,
-    letterSpacing: 8,
+    letterSpacing: 4,
     marginBottom: SIZES.spacingSmall,
+    textAlign: "center",
   },
   subtitle: {
-    fontSize: SIZES.textMedium,
+    fontSize: SIZES.textMedium + 2,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingLarge * 2,
+    textAlign: "center",
+    letterSpacing: 1,
+    opacity: 0.9,
   },
   descriptionCard: {
     backgroundColor: COLORS.backgroundSecondary,
@@ -295,6 +301,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     lineHeight: 26,
     marginBottom: SIZES.spacingMedium,
+    textAlign: "left",
   },
   testPrompt: {
     backgroundColor: COLORS.backgroundSecondary,
@@ -310,11 +317,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.textPrimary,
     marginBottom: SIZES.spacingSmall,
+    textAlign: "left",
   },
   testPromptDescription: {
     fontSize: SIZES.textSmall,
     color: COLORS.textSecondary,
     lineHeight: 24,
+    textAlign: "left",
   },
   statusCard: {
     backgroundColor: COLORS.backgroundSecondary,
@@ -328,11 +337,13 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textSmall,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingSmall,
+    textAlign: "center",
   },
   statusValue: {
     fontSize: SIZES.textMedium,
     fontWeight: "bold",
     color: COLORS.green,
+    textAlign: "center",
   },
   primaryButton: {
     backgroundColor: COLORS.green,
@@ -342,12 +353,16 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.spacingMedium,
     minWidth: 250,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: SIZES.touchTarget,
   },
   primaryButtonText: {
     color: COLORS.background,
     fontSize: SIZES.textMedium,
     fontWeight: "bold",
     letterSpacing: 2,
+    textAlign: "center",
+    width: "100%",
   },
   secondaryButton: {
     backgroundColor: "transparent",
@@ -358,16 +373,21 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     minWidth: 250,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: SIZES.touchTarget,
   },
   secondaryButtonText: {
     color: COLORS.textSecondary,
     fontSize: SIZES.textSmall,
+    textAlign: "center",
+    width: "100%",
   },
   footer: {
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: SIZES.spacingLarge * 2,
     opacity: 0.6,
+    textAlign: "center",
   },
   logoutButton: {
     backgroundColor: "transparent",
@@ -377,10 +397,14 @@ const styles = StyleSheet.create({
     marginTop: SIZES.spacingLarge * 2,
     minWidth: 250,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: SIZES.touchTarget,
   },
   logoutButtonText: {
     color: COLORS.textSecondary,
     fontSize: SIZES.textSmall,
     opacity: 0.7,
+    textAlign: "center",
+    width: "100%",
   },
 });

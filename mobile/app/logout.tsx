@@ -86,7 +86,7 @@ export default function LogoutScreen() {
         <View style={styles.confirmationCard}>
           <Text style={styles.confirmationTitle}>Are you sure you want to logout?</Text>
           <Text style={styles.confirmationDescription}>
-            You will need to login again to access your account and continue using Delta.
+            You will need to login again to access your account and continue using True Light.
           </Text>
         </View>
 
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: SIZES.textXL + 16,
-    fontWeight: 'bold',
+    fontSize: SIZES.textXL + 20,
+    fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: 8,
+    letterSpacing: 4,
     marginBottom: SIZES.spacingLarge * 2,
     textAlign: 'center',
   },
@@ -156,17 +156,20 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textSmall,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingSmall,
+    textAlign: 'center',
   },
   userInfoValue: {
     fontSize: SIZES.textLarge,
     fontWeight: 'bold',
     color: COLORS.green,
     marginBottom: SIZES.spacingSmall / 2,
+    textAlign: 'center',
   },
   userInfoEmail: {
     fontSize: SIZES.textSmall,
     color: COLORS.textSecondary,
     opacity: 0.8,
+    textAlign: 'center',
   },
   confirmationCard: {
     backgroundColor: COLORS.backgroundSecondary,
@@ -212,6 +215,8 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textMedium,
     fontWeight: 'bold',
     letterSpacing: 2,
+    textAlign: 'center',
+    width: '100%',
   },
   cancelButton: {
     backgroundColor: 'transparent',
@@ -230,6 +235,8 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textMedium,
     fontWeight: 'bold',
     letterSpacing: 2,
+    textAlign: 'center',
+    width: '100%',
   },
   loadingText: {
     fontSize: SIZES.textSmall,

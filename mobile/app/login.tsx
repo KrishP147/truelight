@@ -94,7 +94,7 @@ export default function LoginScreen() {
 
       const result = await register(data);
       setAuthUser(result.user);
-      speak('Registration successful. Welcome to Delta.');
+      speak('Registration successful. Welcome to True Light.');
       router.replace('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Registration failed';
@@ -113,9 +113,9 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title} accessibilityRole="header">
-          DELTA
+          True Light
         </Text>
-        <Text style={styles.subtitle}>Traffic Signal Assistant</Text>
+        <Text style={styles.subtitle}>Color Assistant</Text>
 
         {/* Tab Selector */}
         <View style={styles.tabContainer}>
@@ -306,18 +306,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: SIZES.textXL + 16,
-    fontWeight: 'bold',
+    fontSize: SIZES.textXL + 20,
+    fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: 8,
+    letterSpacing: 4,
     marginBottom: SIZES.spacingSmall,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: SIZES.textMedium,
+    fontSize: SIZES.textMedium + 2,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingLarge * 2,
     textAlign: 'center',
+    letterSpacing: 1,
+    opacity: 0.9,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -339,9 +341,11 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textMedium,
     fontWeight: 'bold',
     color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   activeTabText: {
     color: COLORS.background,
+    textAlign: 'center',
   },
   formContainer: {
     width: '100%',
@@ -355,6 +359,7 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textSmall,
     color: COLORS.green,
     textDecorationLine: 'underline',
+    textAlign: 'center',
   },
   input: {
     backgroundColor: COLORS.backgroundSecondary,
@@ -366,6 +371,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     minHeight: SIZES.touchTarget,
+    textAlign: 'left',
+    paddingHorizontal: SIZES.spacingLarge,
   },
   primaryButton: {
     backgroundColor: COLORS.green,
@@ -385,6 +392,8 @@ const styles = StyleSheet.create({
     fontSize: SIZES.textMedium,
     fontWeight: 'bold',
     letterSpacing: 2,
+    textAlign: 'center',
+    width: '100%',
   },
 });
 

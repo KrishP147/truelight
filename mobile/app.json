@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Delta",
-    "slug": "delta",
+    "name": "True Light",
+    "slug": "true-light",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,8 +15,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Delta needs camera access to detect traffic signals and help you navigate safely.",
-        "NSMicrophoneUsageDescription": "Delta may use the microphone for voice commands in future updates."
+        "NSCameraUsageDescription": "True Light needs camera access to detect traffic signals and help you navigate safely.",
+        "NSMicrophoneUsageDescription": "True Light may use the microphone for voice commands in future updates."
       }
     },
     "android": {
@@ -33,10 +33,10 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Delta needs camera access to detect traffic signals and keep you safe."
+          "cameraPermission": "True Light needs camera access to detect traffic signals and keep you safe."
         }
       ]
     ],
-    "scheme": "delta"
+    "scheme": "true-light"
   }
 }
