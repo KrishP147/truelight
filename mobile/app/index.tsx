@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SIZES, ColorblindnessType } from "../constants/accessibility";
@@ -23,21 +23,48 @@ import {
   completeOnboarding,
 } from "../services/storage";
 import { speak } from "../services/speech";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { user, isAuth, loading: authLoading, logout } = useAuth();
   const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
   const [userColorblindType, setUserColorblindType] =
     useState<ColorblindnessType>("unknown");
 
   useEffect(() => {
-    // Check if user has already completed onboarding
-    const completed = isOnboardingComplete();
-    setHasCompletedSetup(completed);
-    if (completed) {
-      setUserColorblindType(getColorblindType());
+    // Check authentication - redirect to login if not authenticated
+    if (!authLoading && !isAuth) {
+      router.replace("/login");
+      return;
     }
-  }, []);
+
+    // If authenticated, check onboarding status
+    if (isAuth) {
+      const completed = isOnboardingComplete();
+      setHasCompletedSetup(completed);
+      if (completed) {
+        setUserColorblindType(getColorblindType());
+      }
+    }
+  }, [isAuth, authLoading, router]);
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.green} />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If not authenticated, this won't render (redirected to login)
+  if (!isAuth) {
+    return null;
+  }
 
   const handleStartTest = () => {
     speak("Starting color vision assessment");
@@ -62,6 +89,11 @@ export default function WelcomeScreen() {
     router.push("/test");
   };
 
+  const handleLogout = () => {
+    speak('Opening logout screen');
+    router.push('/logout');
+  };
+
   // If user has completed setup, show simplified home
   if (hasCompletedSetup) {
     return (
@@ -74,6 +106,13 @@ export default function WelcomeScreen() {
             DELTA
           </Text>
           <Text style={styles.subtitle}>Traffic Signal Assistant</Text>
+
+          {user && (
+            <View style={styles.userCard}>
+              <Text style={styles.userLabel}>Logged in as</Text>
+              <Text style={styles.userValue}>{user.username}</Text>
+            </View>
+          )}
 
           <View style={styles.statusCard}>
             <Text style={styles.statusLabel}>Your Settings</Text>
@@ -98,6 +137,15 @@ export default function WelcomeScreen() {
             accessibilityLabel="Retake the color vision test"
           >
             <Text style={styles.secondaryButtonText}>Retake Vision Test</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Logout"
+          >
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -183,6 +231,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: SIZES.spacingMedium,
+    fontSize: SIZES.textMedium,
+    color: COLORS.textSecondary,
+  },
   content: {
     flex: 1,
     justifyContent: "center",
@@ -194,6 +252,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: SIZES.spacingLarge,
+  },
+  userCard: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: SIZES.borderRadius,
+    padding: SIZES.spacingMedium,
+    marginBottom: SIZES.spacingMedium,
+    width: "100%",
+    alignItems: "center",
+  },
+  userLabel: {
+    fontSize: SIZES.textSmall,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.spacingSmall / 2,
+  },
+  userValue: {
+    fontSize: SIZES.textMedium,
+    fontWeight: "bold",
+    color: COLORS.green,
   },
   title: {
     fontSize: SIZES.textXL + 16,
@@ -292,5 +368,19 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: SIZES.spacingLarge * 2,
     opacity: 0.6,
+  },
+  logoutButton: {
+    backgroundColor: "transparent",
+    paddingHorizontal: SIZES.spacingLarge,
+    paddingVertical: SIZES.buttonPadding / 2,
+    borderRadius: SIZES.borderRadius,
+    marginTop: SIZES.spacingLarge * 2,
+    minWidth: 250,
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: SIZES.textSmall,
+    opacity: 0.7,
   },
 });

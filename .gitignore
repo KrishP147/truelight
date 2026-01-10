@@ -38,3 +38,10 @@ Thumbs.db
 # Build outputs
 build/
 *.tsbuildinfo
+
+# Database files
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
