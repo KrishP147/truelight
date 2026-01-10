@@ -112,8 +112,9 @@ function speakWithExpo(message: string, state?: SignalState): void {
 
 /**
  * Speak using ElevenLabs (natural voice, requires internet)
+ * Exported for direct use in components that need ElevenLabs-specific alerts
  */
-async function speakWithElevenLabs(
+export async function speakWithElevenLabs(
   message: string,
   state?: SignalState
 ): Promise<void> {

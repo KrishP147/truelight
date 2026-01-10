@@ -3,10 +3,15 @@
  *
  * Captures camera frames and sends them to the backend for analysis.
  * Optimized for real-time traffic signal detection with dashcam features.
+ * 
+ * Enhanced Features:
+ * - Bounding boxes around detected objects
+ * - Color-specific detection based on user's colorblindness profile
+ * - ElevenLabs voice for color-related alerts only
  */
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import {
   CameraView as ExpoCameraView,
   useCameraPermissions,
@@ -17,10 +22,13 @@ import {
   TIMING,
   SignalState,
   getSignalMessage,
+  ColorblindnessType,
 } from "../constants/accessibility";
-import { detectSignal, DetectionResponse } from "../services/api";
-import { speakSignalState, resetSpeechState } from "../services/speech";
+import { detectSignal, DetectionResponse, DetectedObject } from "../services/api";
+import { speakSignalState, resetSpeechState, speakWithElevenLabs } from "../services/speech";
 import { useAppStore, ColorBlindnessType } from "../store/useAppStore";
+import { BoundingBoxOverlay } from "./BoundingBoxOverlay";
+import { getColorProfile, DETECTABLE_OBJECTS, DetectableObject } from "../constants/colorProfiles";
 
 interface Props {
   colorblindType: ColorBlindnessType;
@@ -39,10 +47,17 @@ export function CameraViewComponent({
   const [currentState, setCurrentState] = useState<SignalState>("unknown");
   const [confidence, setConfidence] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Get screen dimensions for bounding box calculations
+  const screenDimensions = Dimensions.get("window");
+  
   // Get settings from store
   const { alertSettings, transportSettings } = useAppStore();
+  
+  // Get the color profile for the user's colorblindness type
+  const colorProfile = getColorProfile(colorblindType as any);
 
   // Calculate frame interval based on transport mode
   const frameInterval =
@@ -68,23 +83,56 @@ export function CameraViewComponent({
         throw new Error("Failed to capture image");
       }
 
-      // Send to backend for analysis
-      const result: DetectionResponse = await detectSignal(photo.base64);
+      // Send to backend for analysis with colorblind type for enhanced detection
+      const result: DetectionResponse = await detectSignal(
+        photo.base64,
+        colorblindType as ColorblindnessType
+      );
 
       // Update state
       setCurrentState(result.state);
       setConfidence(result.confidence);
+      
+      // Update detected objects for bounding box overlay
+      if (result.detectedObjects) {
+        setDetectedObjects(result.detectedObjects);
+      } else {
+        setDetectedObjects([]);
+      }
 
       // Notify parent component
       onDetection?.(result.state, result.confidence);
 
       // Speak the result if confidence is high enough
       if (result.confidence >= alertSettings.minConfidenceToAlert) {
-        await speakSignalState(
-          result.state,
-          colorblindType as any, // Type compatibility
-          alertSettings.positionCuesEnabled
-        );
+        // Check if any detected objects are problematic colors for this user
+        const problematicObjects = result.detectedObjects?.filter(
+          obj => obj.isProblematicColor
+        ) || [];
+        
+        // Use ElevenLabs for color-related alerts if enabled in profile
+        if (colorProfile.useElevenLabs && problematicObjects.length > 0) {
+          // Generate descriptive alert for problematic colors
+          const alertMessage = generateColorAlert(problematicObjects, result.state);
+          try {
+            await speakWithElevenLabs(alertMessage);
+          } catch (e) {
+            // Fallback to regular speech if ElevenLabs fails
+            console.warn("ElevenLabs failed, falling back to regular speech:", e);
+            await speakSignalState(
+              result.state,
+              colorblindType as any,
+              alertSettings.positionCuesEnabled
+            );
+          }
+        } else {
+          // Use regular speech for non-problematic colors
+          await speakSignalState(
+            result.state,
+            colorblindType as any,
+            alertSettings.positionCuesEnabled
+          );
+        }
       }
     } catch (error) {
       console.error("Capture error:", error);
@@ -96,11 +144,62 @@ export function CameraViewComponent({
     isProcessing,
     isCapturing,
     colorblindType,
+    colorProfile.useElevenLabs,
     onError,
     onDetection,
     alertSettings.minConfidenceToAlert,
     alertSettings.positionCuesEnabled,
   ]);
+  
+  // Generate descriptive alert for any detected object with problematic colors
+  const generateColorAlert = (objects: DetectedObject[], state: SignalState): string => {
+    const highPriorityObjects = objects.filter(obj => obj.alertPriority === "high" || obj.alertPriority === "critical");
+    
+    if (highPriorityObjects.length === 0) {
+      // Default message based on traffic light state
+      switch (state) {
+        case "red":
+          return "Red signal ahead. Stop.";
+        case "yellow":
+          return "Yellow signal. Prepare to stop.";
+        case "green":
+          return "Green signal. You may proceed.";
+        default:
+          return "Signal detected.";
+      }
+    }
+    
+    // Find the matching detectable object for better messages
+    const alertMessages: string[] = [];
+    
+    for (const obj of highPriorityObjects) {
+      // Look up the object in our DETECTABLE_OBJECTS for proper messaging
+      const detectedObjInfo = DETECTABLE_OBJECTS.find(
+        d => d.name.toLowerCase() === obj.label.toLowerCase() || 
+             d.id === obj.label.toLowerCase().replace(/\s+/g, '_')
+      );
+      
+      if (detectedObjInfo) {
+        // Use the predefined alert message and action
+        alertMessages.push(
+          `${detectedObjInfo.alertMessage}. ${detectedObjInfo.actionRequired || ''}`
+        );
+      } else {
+        // Fallback for unknown objects
+        alertMessages.push(`${obj.label} detected ahead.`);
+      }
+    }
+    
+    // Combine messages, prioritizing critical ones
+    if (alertMessages.length === 1) {
+      return alertMessages[0];
+    } else if (alertMessages.length > 1) {
+      // Multiple objects - announce the most critical one
+      return `Warning! Multiple hazards. ${alertMessages[0]}`;
+    }
+    
+    return "Hazard detected ahead.";
+  };
 
   // Start/stop capture interval
   useEffect(() => {
@@ -205,6 +304,15 @@ export function CameraViewComponent({
     <View style={styles.container}>
       {/* Camera preview - full screen for dashcam mode */}
       <ExpoCameraView ref={cameraRef} style={styles.camera} facing="back">
+        {/* Bounding box overlay for detected objects */}
+        <BoundingBoxOverlay
+          objects={detectedObjects}
+          imageWidth={640}
+          imageHeight={480}
+          containerWidth={screenDimensions.width}
+          containerHeight={screenDimensions.height}
+        />
+        
         {/* Status overlay at top */}
         <View style={styles.statusOverlay}>
           {/* State indicator with optional shape */}
@@ -246,6 +354,15 @@ export function CameraViewComponent({
                 },
               ]}
             />
+          </View>
+        )}
+        
+        {/* Detected objects count indicator */}
+        {detectedObjects.length > 0 && (
+          <View style={styles.objectCountBadge}>
+            <Text style={styles.objectCountText}>
+              {detectedObjects.length} object{detectedObjects.length !== 1 ? 's' : ''} detected
+            </Text>
           </View>
         )}
       </ExpoCameraView>
@@ -386,6 +503,20 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 18,
     fontWeight: "bold",
+  },
+  objectCountBadge: {
+    position: "absolute",
+    bottom: 100,
+    alignSelf: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  objectCountText: {
+    color: COLORS.textPrimary,
+    fontSize: 12,
+    fontWeight: "500",
   },
   message: {
     color: COLORS.textPrimary,
