@@ -426,8 +426,16 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
       // Notify parent component
       onDetection?.(result.state, result.confidence);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Detection failed";
+
+      // Suppress specific benign error reported by user
+      if (errorMessage.includes("Image could not be captured")) {
+        // console.log("[CameraView] Benign capture error suppressed");
+        return;
+      }
+
       console.error("Capture error:", error);
-      onError?.(error instanceof Error ? error.message : "Detection failed");
+      onError?.(errorMessage);
     } finally {
       setIsProcessing(false);
     }

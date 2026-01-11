@@ -25,32 +25,32 @@ const VISION_TYPES: {
   label: string;
   description: string;
 }[] = [
-  {
-    type: "normal",
-    label: "Normal Vision",
-    description: "No color vision deficiency",
-  },
-  {
-    type: "protanopia",
-    label: "Protanopia",
-    description: "Difficulty seeing red",
-  },
-  {
-    type: "deuteranopia",
-    label: "Deuteranopia",
-    description: "Difficulty seeing green",
-  },
-  {
-    type: "tritanopia",
-    label: "Tritanopia",
-    description: "Difficulty seeing blue/yellow",
-  },
-  {
-    type: "low_vision",
-    label: "Low Vision",
-    description: "Prefer full audio descriptions",
-  },
-];
+    {
+      type: "normal",
+      label: "Normal Vision",
+      description: "No color vision deficiency",
+    },
+    {
+      type: "protanopia",
+      label: "Protanopia",
+      description: "Difficulty seeing red",
+    },
+    {
+      type: "deuteranopia",
+      label: "Deuteranopia",
+      description: "Difficulty seeing green",
+    },
+    {
+      type: "tritanopia",
+      label: "Tritanopia",
+      description: "Difficulty seeing blue/yellow",
+    },
+    {
+      type: "low_vision",
+      label: "Low Vision",
+      description: "Prefer full audio descriptions",
+    },
+  ];
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function WelcomeScreen() {
   const [userColorblindType, setUserColorblindType] =
     useState<ColorblindnessType>("unknown");
   const [selectedType, setSelectedType] =
-    useState<ColorblindnessType>("unknown");
+    useState<ColorblindnessType>("normal");
 
   useEffect(() => {
     // Check authentication - redirect to login if not authenticated
@@ -108,10 +108,12 @@ export default function WelcomeScreen() {
   };
 
   const handleStartCamera = () => {
-    if (selectedType === "unknown") {
-      speak("Please select your vision type first");
-      return;
+    // If "normal" is selected (default) but not explicitly saved yet, save it now
+    if (selectedType !== "unknown") {
+      setColorblindType(selectedType);
+      completeOnboarding();
     }
+
     speak("Starting traffic signal detection");
     router.push("/camera");
   };

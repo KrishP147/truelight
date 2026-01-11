@@ -109,7 +109,7 @@ interface AppState {
 
 // Default values
 const defaultColorVisionProfile: ColorVisionProfile = {
-  type: "unknown",
+  type: "normal",
   severity: "moderate",
   confidence: 0,
   testDate: null,
