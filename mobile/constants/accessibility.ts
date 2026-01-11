@@ -3,20 +3,34 @@
  *
  * Dark mode design - clean, minimal, no gradients
  * Sharp corners, white text on dark backgrounds
+ * 
+ * ADAPTIVE COLOR SYSTEM:
+ * Colors automatically adapt based on user's colorblindness type
+ * to ensure all UI elements are visible and distinguishable.
  */
 
-export const COLORS = {
+/**
+ * Colorblindness Types
+ * Common medical terms for color vision deficiencies
+ */
+export type ColorblindnessType =
+  | "normal"
+  | "protanopia"     // Red-blind (severe) - most common
+  | "protanomaly"    // Red-weak (mild)
+  | "deuteranopia"   // Green-blind (severe) - most common
+  | "deuteranomaly"  // Green-weak (mild) - most common overall
+  | "tritanopia"     // Blue-yellow blind (rare)
+  | "low_vision"     // General low vision
+  | "unknown";
+
+/**
+ * Base colors - used as fallback and for normal vision
+ */
+const BASE_COLORS = {
   // Background - dark mode
   background: "#0A0A0B",
   backgroundSecondary: "#121214",
   backgroundTertiary: "#1A1A1E",
-
-  // Signal state colors - only used when displaying detection results
-  red: "#EF4444",
-  yellow: "#F59E0B",
-  green: "#10B981",
-  orange: "#FF6B35",
-  unknown: "#6B7280",
 
   // Text - white/light for dark mode
   textPrimary: "#FFFFFF",
@@ -29,10 +43,96 @@ export const COLORS = {
   buttonBackground: "#FFFFFF",
   buttonText: "#0A0A0B",
 
-  // Accent - orange only, no purple/blue
+  // Standard signal colors (for normal vision)
+  red: "#EF4444",
+  yellow: "#F59E0B",
+  green: "#10B981",
+  orange: "#FF6B35",
+  unknown: "#6B7280",
+
+  // Accent
   accent: "#FF6B35",
   accentDim: "rgba(255, 107, 53, 0.2)",
+  
+  // Alert colors
+  alertPrimary: "#FF3366",    // Default alert (red-pink)
+  alertSecondary: "#00FF88",  // Active/locked target (green)
 };
+
+/**
+ * Adaptive color palettes for different colorblindness types
+ * These replace problematic colors with ones the user can see
+ */
+const ADAPTIVE_PALETTES: Record<ColorblindnessType, Partial<typeof BASE_COLORS>> = {
+  normal: {},
+  
+  // Red-blind: Replace reds with cyan/blue tones
+  protanopia: {
+    red: "#00CED1",           // Cyan instead of red
+    alertPrimary: "#00BFFF",  // Deep sky blue for alerts (not red!)
+    accent: "#00CED1",        // Cyan accent
+    accentDim: "rgba(0, 206, 209, 0.2)",
+    orange: "#FFD700",        // Gold (more yellow)
+  },
+  
+  // Red-weak: Similar to protanopia but less severe
+  protanomaly: {
+    red: "#20B2AA",           // Light sea green
+    alertPrimary: "#00CED1",  // Cyan for alerts
+    accent: "#20B2AA",
+    accentDim: "rgba(32, 178, 170, 0.2)",
+  },
+  
+  // Green-blind: Replace greens with blue/purple tones  
+  deuteranopia: {
+    green: "#9370DB",         // Medium purple instead of green
+    alertPrimary: "#FF69B4",  // Hot pink for alerts (they can see pink)
+    accent: "#FF69B4",        // Pink accent
+    accentDim: "rgba(255, 105, 180, 0.2)",
+    alertSecondary: "#9370DB", // Purple for active target
+  },
+  
+  // Green-weak: Similar but less severe
+  deuteranomaly: {
+    green: "#8A2BE2",         // Blue violet
+    alertPrimary: "#FF69B4",  // Hot pink
+    accent: "#DA70D6",        // Orchid
+    accentDim: "rgba(218, 112, 214, 0.2)",
+  },
+  
+  // Blue-yellow blind: Replace blues with red/magenta, yellows with pink
+  tritanopia: {
+    yellow: "#FF6B9D",        // Pink instead of yellow
+    alertPrimary: "#FF4500",  // Orange-red for alerts (not blue)
+    accent: "#FF4500",        // Orange-red
+    accentDim: "rgba(255, 69, 0, 0.2)",
+    alertSecondary: "#FF6B9D", // Pink for active
+  },
+  
+  // Low vision: High contrast, larger elements
+  low_vision: {
+    alertPrimary: "#FFFF00",  // Bright yellow (high contrast)
+    accent: "#FFFF00",
+    accentDim: "rgba(255, 255, 0, 0.3)",
+    textSecondary: "#CCCCCC", // Brighter secondary text
+  },
+  
+  unknown: {},
+};
+
+/**
+ * Get adaptive colors based on user's colorblindness type
+ */
+export function getAdaptiveColors(colorblindType: ColorblindnessType = 'normal') {
+  const adaptations = ADAPTIVE_PALETTES[colorblindType] || {};
+  return { ...BASE_COLORS, ...adaptations };
+}
+
+/**
+ * Default COLORS export - uses base colors
+ * Components should use getAdaptiveColors() when colorblind type is known
+ */
+export const COLORS = BASE_COLORS;
 
 export const SIZES = {
   // Text sizes - clean hierarchy
@@ -71,26 +171,43 @@ export const TIMING = {
 export type SignalState = "red" | "yellow" | "green" | "flashing" | "unknown";
 
 /**
- * Colorblindness Types
- *
- * We support the three main types of color vision deficiency:
- * - Protanopia: Red-blind (difficulty distinguishing red)
- * - Deuteranopia: Green-blind (difficulty distinguishing green)
- * - Protanomaly: Red-weak (reduced sensitivity to red)
- * - Deuteranomaly: Green-weak (reduced sensitivity to green)
- * - Tritanopia: Blue-blind (rare, difficulty with blue/yellow)
- * - Normal: No color vision deficiency
- * - Low Vision: General low vision, relies primarily on audio
+ * Common colorblindness type labels for UI display
+ * Uses medical/common names, not "can't see X" descriptions
  */
-export type ColorblindnessType =
-  | "normal"
-  | "protanopia" // Red-blind
-  | "protanomaly" // Red-weak
-  | "deuteranopia" // Green-blind
-  | "deuteranomaly" // Green-weak
-  | "tritanopia" // Blue-yellow blind
-  | "low_vision" // Relies on audio
-  | "unknown";
+export const COLORBLINDNESS_LABELS: Record<ColorblindnessType, { name: string; description: string }> = {
+  normal: {
+    name: "Normal Vision",
+    description: "Standard color perception",
+  },
+  protanopia: {
+    name: "Protanopia",
+    description: "Red-blind color vision (most common type)",
+  },
+  protanomaly: {
+    name: "Protanomaly", 
+    description: "Red-weak color vision (mild form)",
+  },
+  deuteranopia: {
+    name: "Deuteranopia",
+    description: "Green-blind color vision (most common type)",
+  },
+  deuteranomaly: {
+    name: "Deuteranomaly",
+    description: "Green-weak color vision (most common overall)",
+  },
+  tritanopia: {
+    name: "Tritanopia",
+    description: "Blue-yellow color vision (rare)",
+  },
+  low_vision: {
+    name: "Low Vision",
+    description: "General visual impairment, uses full audio cues",
+  },
+  unknown: {
+    name: "Not Set",
+    description: "Take the test to determine your vision type",
+  },
+};
 
 /**
  * Signal messages tailored to colorblindness type

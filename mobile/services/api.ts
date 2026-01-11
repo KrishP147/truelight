@@ -1,38 +1,40 @@
 /**
- * Detection API Service - COMPREHENSIVE OBJECT DETECTION
+ * Detection API Service - PYTHON OPENCV DETECTION
  *
- * This service provides general-purpose object detection with colorblind-aware alerts.
+ * This service provides object detection with real color analysis for colorblind users.
+ * Uses Python OpenCV/YOLO microservice for accurate color detection.
  * 
  * Key Features:
  * - Detects ALL objects in frame (cars, people, signs, lights, etc.)
+ * - REAL color analysis using OpenCV HSV color space
  * - Shows bounding boxes for EVERYTHING detected
- * - Only generates voice alerts for objects with colors the user cannot see well
- * - Uses Python OpenCV/YOLO microservice as primary detection method
- * - Falls back to Roboflow API if Python service unavailable
+ * - Generates voice alerts for objects with colors the user cannot see well
  */
 
 import { TIMING, SignalState, ColorblindnessType } from '../constants/accessibility';
-import { getColorProfile, isProblematicColor } from '../constants/colorProfiles';
 
-// Python detection service URL (direct connection to Python service)
-// For Android emulator, use 10.0.2.2 to reach host localhost
-// For physical device, use your computer's IP address
-const PYTHON_SERVICE_URL = __DEV__ 
-  ? 'http://192.168.1.100:8000'  // Change to your IP
-  : 'http://localhost:8000';
+// Backend proxy URL (Next.js backend that forwards to Python service)
+// Set EXPO_PUBLIC_API_URL in .env to your computer's IP for physical devices
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
-// Backend proxy URL (goes through Next.js backend)
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-
-// Fallback: Roboflow API for when Python service is down
-const ROBOFLOW_API_KEY = process.env.EXPO_PUBLIC_ROBOFLOW_API_KEY || 'SUVn3OiqF6PqIASCVWJT';
-const ROBOFLOW_MODEL = 'coco/9';
+// Python detection service URL - derives from backend URL (same host, port 8000)
+// This allows physical devices to reach the Python service directly
+const getBaseHost = () => {
+  const url = API_BASE_URL;
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.hostname}`;
+  } catch {
+    return 'http://localhost';
+  }
+};
+const PYTHON_SERVICE_URL = `${getBaseHost()}:8000`;
 
 // Detection timing
-const DETECTION_TIMEOUT = 10000; // 10 seconds timeout
+const DETECTION_TIMEOUT = 15000; // 15 seconds timeout
 
-console.log('[Detection] Service initialized');
 console.log('[Detection] Backend URL:', API_BASE_URL);
+console.log('[Detection] Python service URL:', PYTHON_SERVICE_URL);
 
 /**
  * Bounding box for detected objects
@@ -82,11 +84,11 @@ export async function detectSignal(
 ): Promise<DetectionResponse> {
   console.log(`[Detection] Starting detection for ${colorblindType} user`);
   
-  // Try methods in order of preference
+  // Try Python service methods - NO Roboflow fallback
+  // Python service provides accurate color analysis essential for colorblind users
   const methods = [
     { name: 'Backend Proxy', fn: () => detectViaBackend(base64Image, colorblindType) },
     { name: 'Direct Python', fn: () => detectWithPython(base64Image, colorblindType) },
-    { name: 'Roboflow', fn: () => detectWithRoboflow(base64Image, colorblindType) },
   ];
   
   for (const method of methods) {
@@ -101,11 +103,12 @@ export async function detectSignal(
   }
   
   // All methods failed - return empty result
-  console.error('[Detection] All detection methods failed');
+  console.error('[Detection] All detection methods failed - is Python service running?');
+  console.error('[Detection] Start it with: cd python-detection && python main.py');
   return {
     state: 'unknown',
     confidence: 0,
-    message: 'Detection unavailable',
+    message: 'Detection service unavailable',
     detectedObjects: [],
     imageWidth: 640,
     imageHeight: 480,
@@ -124,6 +127,10 @@ async function detectViaBackend(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DETECTION_TIMEOUT);
 
+  // Log image data info for debugging
+  console.log(`[Detection] Image data length: ${base64Image.length} chars`);
+  console.log(`[Detection] Image starts with: ${base64Image.substring(0, 50)}...`);
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/detect/objects`, {
       method: 'POST',
@@ -131,7 +138,7 @@ async function detectViaBackend(
       body: JSON.stringify({
         image: base64Image,
         colorblindness_type: colorblindType,
-        min_confidence: 0.25,
+        min_confidence: 0.15,
       }),
       signal: controller.signal,
     });
@@ -259,194 +266,6 @@ function processPythonResponse(
 }
 
 /**
- * Roboflow API detection (fallback)
- */
-async function detectWithRoboflow(
-  base64Image: string,
-  colorblindType: ColorblindnessType
-): Promise<DetectionResponse> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DETECTION_TIMEOUT);
-
-  try {
-    // Clean base64 string
-    const cleanBase64 = base64Image.includes(',') 
-      ? base64Image.split(',')[1] 
-      : base64Image;
-    
-    const response = await fetch(
-      `https://detect.roboflow.com/${ROBOFLOW_MODEL}?api_key=${ROBOFLOW_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: cleanBase64,
-        signal: controller.signal,
-      }
-    );
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Roboflow error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return processRoboflowResponse(data, colorblindType);
-    
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-}
-
-/**
- * Process Roboflow response into our format
- */
-function processRoboflowResponse(
-  data: any,
-  colorblindType: ColorblindnessType
-): DetectionResponse {
-  const detectedObjects: DetectedObject[] = [];
-  const alertObjects: DetectedObject[] = [];
-  
-  const imageWidth = data.image?.width || 640;
-  const imageHeight = data.image?.height || 480;
-
-  for (let i = 0; i < (data.predictions || []).length; i++) {
-    const pred = data.predictions[i];
-    
-    // Roboflow gives center coordinates - convert to top-left
-    const bbox: BoundingBox = {
-      x: Math.round(pred.x - pred.width / 2),
-      y: Math.round(pred.y - pred.height / 2),
-      width: Math.round(pred.width),
-      height: Math.round(pred.height),
-    };
-    
-    // Estimate colors based on object type (Roboflow doesn't do color analysis)
-    const estimatedColors = estimateObjectColors(pred.class);
-    
-    // Check if any estimated colors are problematic for this user
-    const isProblematic = estimatedColors.some(color => 
-      isColorProblematicForType(color, colorblindType)
-    );
-    
-    const priority = getObjectPriority(pred.class, isProblematic);
-    
-    const detected: DetectedObject = {
-      id: `rf-${i}-${Date.now()}`,
-      label: formatLabel(pred.class),
-      class: pred.class.toLowerCase(),
-      confidence: pred.confidence,
-      bbox,
-      colors: estimatedColors,
-      isProblematicColor: isProblematic,
-      alertPriority: priority,
-      colorWarning: isProblematic ? `${estimatedColors[0]} detected` : undefined,
-    };
-    
-    detectedObjects.push(detected);
-    
-    if (isProblematic && ['critical', 'high', 'medium'].includes(priority)) {
-      alertObjects.push(detected);
-    }
-  }
-
-  const message = generateAlertMessage(alertObjects, detectedObjects.length);
-  
-  console.log(`[Detection] Roboflow: ${detectedObjects.length} objects, ${alertObjects.length} alerts`);
-
-  return {
-    state: 'unknown',
-    confidence: detectedObjects.length > 0 
-      ? Math.max(...detectedObjects.map(o => o.confidence)) 
-      : 0,
-    message,
-    detectedObjects,
-    alertObjects,
-    imageWidth,
-    imageHeight,
-  };
-}
-
-/**
- * Estimate what colors an object typically has
- */
-function estimateObjectColors(objectClass: string): string[] {
-  const colorMap: Record<string, string[]> = {
-    'traffic light': ['red', 'yellow', 'green'],
-    'stop sign': ['red'],
-    'fire hydrant': ['red', 'yellow'],
-    'car': ['red', 'white', 'black'],
-    'truck': ['red', 'white'],
-    'bus': ['yellow', 'white'],
-    'motorcycle': ['red', 'black'],
-    'bicycle': ['red', 'blue'],
-    'person': [],
-    'boat': ['white'],
-    'airplane': ['white'],
-    'train': ['red', 'yellow'],
-    'umbrella': ['red', 'blue'],
-    'banana': ['yellow'],
-    'apple': ['red', 'green'],
-    'orange': ['orange'],
-    'broccoli': ['green'],
-    'carrot': ['orange'],
-    'potted plant': ['green'],
-  };
-  
-  return colorMap[objectClass.toLowerCase()] || [];
-}
-
-/**
- * Check if a color is problematic for a colorblindness type
- */
-function isColorProblematicForType(color: string, type: ColorblindnessType): boolean {
-  const problematicColors: Record<string, string[]> = {
-    'protanopia': ['red', 'orange', 'green'],
-    'protanomaly': ['red', 'orange'],
-    'deuteranopia': ['red', 'green', 'yellow'],
-    'deuteranomaly': ['green', 'yellow'],
-    'tritanopia': ['blue', 'yellow'],
-    'tritanomaly': ['blue', 'yellow'],
-    'low_vision': ['red', 'green', 'yellow', 'blue', 'orange'],
-    'normal': [],
-    'unknown': ['red', 'green', 'yellow'],
-  };
-  
-  const userProblematicColors = problematicColors[type] || problematicColors['unknown'];
-  return userProblematicColors.includes(color.toLowerCase());
-}
-
-/**
- * Get priority for an object based on type and color relevance
- */
-function getObjectPriority(
-  objectClass: string, 
-  isProblematic: boolean
-): 'critical' | 'high' | 'medium' | 'low' | 'none' {
-  const cls = objectClass.toLowerCase();
-  
-  // Critical - traffic control
-  if (['traffic light', 'stop sign'].includes(cls)) {
-    return isProblematic ? 'critical' : 'high';
-  }
-  
-  // High - vehicles (potential brake lights)
-  if (['car', 'truck', 'bus', 'motorcycle'].includes(cls)) {
-    return isProblematic ? 'high' : 'medium';
-  }
-  
-  // Medium - road users
-  if (['person', 'bicycle', 'fire hydrant'].includes(cls)) {
-    return isProblematic ? 'medium' : 'low';
-  }
-  
-  // Low - other
-  return isProblematic ? 'low' : 'none';
-}
-
-/**
  * Map Python service priority to our type
  */
 function mapPriority(priority: string): 'critical' | 'high' | 'medium' | 'low' | 'none' {
@@ -512,29 +331,47 @@ function generateAlertMessage(
 export async function checkDetectionHealth(): Promise<{
   backend: boolean;
   python: boolean;
-  roboflow: boolean;
 }> {
-  const results = { backend: false, python: false, roboflow: true }; // Assume Roboflow works
+  const results = { backend: false, python: false };
+  
+  // Helper for timeout
+  const fetchWithTimeout = async (url: string, timeout = 5000): Promise<Response> => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  };
   
   // Check backend
   try {
-    const res = await fetch(`${API_BASE_URL}/api/health`, {
-      signal: AbortSignal.timeout(3000),
-    });
+    console.log('[Health] Checking backend:', `${API_BASE_URL}/api/health`);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/health`, 5000);
     results.backend = res.ok;
-  } catch {}
+    console.log('[Health] Backend:', results.backend ? 'OK' : 'Failed');
+  } catch (e) {
+    console.log('[Health] Backend error:', e);
+  }
   
   // Check Python service
   try {
-    const res = await fetch(`${PYTHON_SERVICE_URL}/health`, {
-      signal: AbortSignal.timeout(3000),
-    });
+    console.log('[Health] Checking Python:', `${PYTHON_SERVICE_URL}/health`);
+    const res = await fetchWithTimeout(`${PYTHON_SERVICE_URL}/health`, 5000);
     if (res.ok) {
       const data = await res.json();
       results.python = data.status === 'healthy';
     }
-  } catch {}
+    console.log('[Health] Python:', results.python ? 'OK' : 'Failed');
+  } catch (e) {
+    console.log('[Health] Python error:', e);
+  }
   
+  console.log('[Health] Results:', results);
   return results;
 }
 
@@ -543,5 +380,5 @@ export async function checkDetectionHealth(): Promise<{
  */
 export async function checkHealth(): Promise<boolean> {
   const health = await checkDetectionHealth();
-  return health.backend || health.python || health.roboflow;
+  return health.backend || health.python;
 }

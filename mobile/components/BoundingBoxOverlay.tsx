@@ -18,6 +18,7 @@ interface Props {
   imageHeight: number;
   containerWidth: number;
   containerHeight: number;
+  activeTargetIndex?: number; // Index of the currently locked-on target
 }
 
 // Colors for the targeting brackets - always orange for all objects
@@ -29,13 +30,15 @@ function TargetBracket({
   left, 
   top, 
   boxWidth, 
-  boxHeight 
+  boxHeight,
+  isActive
 }: { 
   targetObj: DetectedObject | TrackedObject;
   left: number;
   top: number;
   boxWidth: number;
   boxHeight: number;
+  isActive?: boolean; // Whether this is the currently locked-on target
 }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const flashAnim = useRef(new Animated.Value(1)).current;
@@ -85,7 +88,7 @@ function TargetBracket({
   const minCornerSize = 12;
   const maxCornerSize = 30;
   const actualCornerSize = Math.max(minCornerSize, Math.min(maxCornerSize, cornerSize));
-  const thickness = isAlert ? 4 : 3;
+  const thickness = isActive ? 4 : 3; // Thicker brackets for active target
 
   return (
     <Animated.View
@@ -101,6 +104,24 @@ function TargetBracket({
         },
       ]}
     >
+      {/* Lock-on cursor/reticle for active target - prominent game-style */}
+      {isActive && (
+        <View style={styles.lockOnCursor}>
+          {/* Large center crosshair */}
+          <View style={[styles.cursorLine, styles.cursorHorizontal]} />
+          <View style={[styles.cursorLine, styles.cursorVertical]} />
+          {/* Outer ring corners */}
+          <View style={[styles.cursorCorner, styles.cursorCornerTL]} />
+          <View style={[styles.cursorCorner, styles.cursorCornerTR]} />
+          <View style={[styles.cursorCorner, styles.cursorCornerBL]} />
+          <View style={[styles.cursorCorner, styles.cursorCornerBR]} />
+          {/* Inner targeting dots */}
+          <View style={[styles.cursorDot, styles.cursorDotTL]} />
+          <View style={[styles.cursorDot, styles.cursorDotTR]} />
+          <View style={[styles.cursorDot, styles.cursorDotBL]} />
+          <View style={[styles.cursorDot, styles.cursorDotBR]} />
+        </View>
+      )}
       {/* Top-left bracket */}
       <View style={[styles.corner, styles.cornerTL, { 
         borderColor: bracketColor,
@@ -156,6 +177,7 @@ export function BoundingBoxOverlay({
   imageHeight,
   containerWidth,
   containerHeight,
+  activeTargetIndex = 0,
 }: Props) {
   if (!objects || objects.length === 0) return null;
 
@@ -163,9 +185,12 @@ export function BoundingBoxOverlay({
   const scaleX = containerWidth / imageWidth;
   const scaleY = containerHeight / imageHeight;
 
+  // Ensure activeTargetIndex is within bounds
+  const safeActiveIndex = Math.max(0, Math.min(activeTargetIndex, objects.length - 1));
+
   return (
     <View style={[styles.container, { width: containerWidth, height: containerHeight }]}>
-      {objects.map((obj) => {
+      {objects.map((obj, index) => {
         // Scale coordinates to container dimensions
         const left = obj.bbox.x * scaleX;
         const top = obj.bbox.y * scaleY;
@@ -175,6 +200,8 @@ export function BoundingBoxOverlay({
         // Skip very small detections
         if (width < 20 || height < 20) return null;
 
+        const isActive = index === safeActiveIndex;
+
         return (
           <TargetBracket
             key={obj.id}
@@ -183,6 +210,7 @@ export function BoundingBoxOverlay({
             top={top}
             boxWidth={width}
             boxHeight={height}
+            isActive={isActive}
           />
         );
       })}
@@ -313,5 +341,119 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  // Lock-on cursor/reticle styles - prominent game-style reticle
+  lockOnCursor: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 80,
+    height: 80,
+    marginLeft: -40,
+    marginTop: -40,
+    pointerEvents: 'none',
+    zIndex: 1000,
+  },
+  cursorLine: {
+    position: 'absolute',
+    backgroundColor: '#FF6B35',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  cursorHorizontal: {
+    top: '50%',
+    left: -20,
+    right: -20,
+    height: 3,
+    marginTop: -1.5,
+  },
+  cursorVertical: {
+    left: '50%',
+    top: -20,
+    bottom: -20,
+    width: 3,
+    marginLeft: -1.5,
+  },
+  cursorCorner: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    backgroundColor: '#FF6B35',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  cursorCornerTL: {
+    top: -4,
+    left: -4,
+    borderTopLeftRadius: 2,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopColor: '#FF6B35',
+    borderLeftColor: '#FF6B35',
+    backgroundColor: 'transparent',
+  },
+  cursorCornerTR: {
+    top: -4,
+    right: -4,
+    borderTopRightRadius: 2,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopColor: '#FF6B35',
+    borderRightColor: '#FF6B35',
+    backgroundColor: 'transparent',
+  },
+  cursorCornerBL: {
+    bottom: -4,
+    left: -4,
+    borderBottomLeftRadius: 2,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomColor: '#FF6B35',
+    borderLeftColor: '#FF6B35',
+    backgroundColor: 'transparent',
+  },
+  cursorCornerBR: {
+    bottom: -4,
+    right: -4,
+    borderBottomRightRadius: 2,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomColor: '#FF6B35',
+    borderRightColor: '#FF6B35',
+    backgroundColor: 'transparent',
+  },
+  cursorDot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF6B35',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  cursorDotTL: {
+    top: 8,
+    left: 8,
+  },
+  cursorDotTR: {
+    top: 8,
+    right: 8,
+  },
+  cursorDotBL: {
+    bottom: 8,
+    left: 8,
+  },
+  cursorDotBR: {
+    bottom: 8,
+    right: 8,
   },
 });

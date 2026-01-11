@@ -66,11 +66,11 @@ export default function CameraScreen() {
 
   const checkBackendConnection = async () => {
     const health = await checkDetectionHealth();
-    // Connected if any detection method works
-    const anyHealthy = health.backend || health.python || health.roboflow;
+    // Connected if Python service works (directly or via backend)
+    const anyHealthy = health.backend || health.python;
     setIsConnected(anyHealthy);
     if (!anyHealthy) {
-      setError(`Detection services unavailable`);
+      setError(`Python detection service unavailable - start with: cd python-detection && start.bat`);
     }
   };
 

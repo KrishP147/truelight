@@ -49,11 +49,11 @@ export function CameraViewComponent({
 }: Props) {
   const cameraRef = useRef<ExpoCameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
-  const [isCapturing, setIsCapturing] = useState(true);
   const [currentState, setCurrentState] = useState<SignalState>("unknown");
   const [confidence, setConfidence] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [detectedObjects, setDetectedObjects] = useState<TrackedObject[]>([]);
+  const [activeTargetIndex, setActiveTargetIndex] = useState(0); // For lock-on cursor cycling
   const [isListening, setIsListening] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [lastFrameBase64, setLastFrameBase64] = useState<string | null>(null);
@@ -179,15 +179,16 @@ export function CameraViewComponent({
 
   // Capture and analyze a frame
   const captureFrame = useCallback(async () => {
-    if (!cameraRef.current || isProcessing || !isCapturing) return;
+    if (!cameraRef.current || isProcessing) return;
 
     try {
       setIsProcessing(true);
 
-      // Capture a photo with reduced quality for faster upload
+      // Capture a photo with better quality for detection
+      console.log('[CameraView] 📸 Taking snapshot...');
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.3,
+        quality: 0.7,  // Higher quality for better detection
         skipProcessing: true,
         shutterSound: false,
       });
@@ -196,14 +197,19 @@ export function CameraViewComponent({
         throw new Error("Failed to capture image");
       }
 
+      console.log(`[CameraView] ✓ Snapshot captured: ${photo.base64.length} chars, ${photo.width}x${photo.height}`);
+
       // Save frame for AI assistant
       setLastFrameBase64(photo.base64);
 
       // Send to backend for analysis with colorblind type for enhanced detection
+      console.log('[CameraView] 🔍 Sending to detection service...');
       const result: DetectionResponse = await detectSignal(
         photo.base64,
         colorblindType as ColorblindnessType
       );
+
+      console.log(`[CameraView] ✓ Detection result: ${result.detectedObjects?.length || 0} objects, state: ${result.state}`);
 
       // Update state
       setCurrentState(result.state);
@@ -211,6 +217,7 @@ export function CameraViewComponent({
       
       // Update detected objects for bounding box overlay with motion tracking
       if (result.detectedObjects && result.detectedObjects.length > 0) {
+        console.log(`[CameraView] Objects detected:`, result.detectedObjects.map(o => `${o.label} (${Math.round(o.confidence*100)}%)`));
         // Apply motion tracking to identify moving objects
         frameNumberRef.current++;
         const trackedObjects = updateMotionTracking(result.detectedObjects, frameNumberRef.current);
@@ -249,7 +256,6 @@ export function CameraViewComponent({
     }
   }, [
     isProcessing,
-    isCapturing,
     colorblindType,
     colorProfile.useElevenLabs,
     onError,
@@ -304,9 +310,9 @@ export function CameraViewComponent({
     return `${colors} ${label} detected ahead.`;
   };
 
-  // Start/stop capture interval
+  // Start capture interval - always active (no pause)
   useEffect(() => {
-    if (isCapturing && permission?.granted) {
+    if (permission?.granted) {
       resetSpeechState();
       captureIntervalRef.current = setInterval(captureFrame, frameInterval);
     }
@@ -317,7 +323,63 @@ export function CameraViewComponent({
         captureIntervalRef.current = null;
       }
     };
-  }, [isCapturing, permission?.granted, captureFrame, frameInterval]);
+  }, [permission?.granted, captureFrame, frameInterval]);
+  
+  // Auto-lock on highest priority target (moving objects or threats)
+  useEffect(() => {
+    if (detectedObjects.length === 0) {
+      setActiveTargetIndex(0);
+      return;
+    }
+    
+    // Calculate priority score for each object
+    // Priority order: Moving objects > Critical alerts > High alerts > Medium alerts > Others
+    const getPriorityScore = (obj: TrackedObject): number => {
+      let score = 0;
+      
+      // Moving objects get highest priority
+      if (obj.isMoving) {
+        score += 1000;
+        // Add velocity magnitude for moving objects
+        const velocityMag = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+        score += velocityMag * 10;
+      }
+      
+      // Alert priority scoring
+      const priorityOrder: Record<string, number> = {
+        critical: 500,
+        high: 200,
+        medium: 50,
+        low: 10,
+        none: 0,
+      };
+      score += priorityOrder[obj.alertPriority] || 0;
+      
+      // Problematic colors get bonus
+      if (obj.isProblematicColor) {
+        score += 100;
+      }
+      
+      // Confidence bonus
+      score += obj.confidence * 10;
+      
+      return score;
+    };
+    
+    // Find the highest priority target
+    let bestIndex = 0;
+    let bestScore = getPriorityScore(detectedObjects[0]);
+    
+    for (let i = 1; i < detectedObjects.length; i++) {
+      const score = getPriorityScore(detectedObjects[i]);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+    
+    setActiveTargetIndex(bestIndex);
+  }, [detectedObjects]);
 
   // Get display info based on state
   const getStateColor = () => {
@@ -406,14 +468,22 @@ export function CameraViewComponent({
   return (
     <View style={styles.container}>
       {/* Camera preview - full screen for dashcam mode */}
-      <ExpoCameraView ref={cameraRef} style={styles.camera} facing="back">
-        {/* Bounding box overlay for detected objects */}
+      <ExpoCameraView 
+        ref={cameraRef} 
+        style={styles.camera} 
+        facing="back"
+        flash="off"
+        enableTorch={false}
+      >
+        {/* Bounding box overlay for detected objects with auto-targeting */}
         <BoundingBoxOverlay
           objects={detectedObjects}
           imageWidth={640}
           imageHeight={480}
           containerWidth={screenDimensions.width}
           containerHeight={screenDimensions.height}
+          activeTargetIndex={activeTargetIndex}
+          colorblindType={colorblindType as ColorblindnessType}
         />
         
         {/* Minimal HUD overlay - only show when signal detected */}
@@ -477,23 +547,15 @@ export function CameraViewComponent({
         )}
       </ExpoCameraView>
 
-      {/* Control buttons - minimal */}
+      {/* Lock-on status indicator */}
       <View style={styles.controlOverlay}>
-        <Pressable
-          style={[
-            styles.controlButton,
-            !isCapturing && styles.controlButtonPaused,
-          ]}
-          onPress={() => setIsCapturing(!isCapturing)}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isCapturing ? "Pause detection" : "Resume detection"
-          }
-        >
-          <Text style={styles.controlButtonText}>
-            {isCapturing ? "||" : "▶"}
+        <View style={styles.lockOnIndicator}>
+          <Text style={styles.lockOnText}>
+            {detectedObjects.length > 0 
+              ? `◎ ${activeTargetIndex + 1}/${detectedObjects.length}` 
+              : "○ SCANNING"}
           </Text>
-        </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -574,6 +636,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 20,
     left: 20,
+  },
+  lockOnIndicator: {
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  lockOnText: {
+    color: COLORS.accent,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "monospace",
   },
   controlButton: {
     backgroundColor: "rgba(0, 0, 0, 0.6)",

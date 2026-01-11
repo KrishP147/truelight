@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Python detection microservice URL
 const PYTHON_SERVICE_URL = process.env.PYTHON_DETECTION_URL || "http://localhost:8000";
 
 /**
  * POST /api/detect/objects
  *
- * General object detection with color analysis for colorblind users.
- * Proxies requests to the Python detection microservice.
+ * Proxies detection requests to the Python OpenCV/YOLO microservice.
+ * The Python service provides:
+ * - YOLO object detection (80 COCO classes)
+ * - OpenCV color analysis in HSV space
+ * - Colorblind-aware problematic color detection
  *
  * Request body:
  * {
@@ -16,6 +20,8 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_DETECTION_URL || "http://localhost
  * }
  */
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const body = await request.json();
 
@@ -26,6 +32,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`[Detection] Forwarding to Python service: ${PYTHON_SERVICE_URL}/detect`);
+    console.log(`[Detection] Colorblindness type: ${body.colorblindness_type || 'normal'}`);
+
     // Forward request to Python detection service
     const response = await fetch(`${PYTHON_SERVICE_URL}/detect`, {
       method: "POST",
@@ -35,61 +44,79 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         image: body.image,
         colorblindness_type: body.colorblindness_type || "normal",
-        min_confidence: body.min_confidence || 0.5,
+        min_confidence: body.min_confidence || 0.15,  // Very low threshold for maximum recall
       }),
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("Python detection service error:", error);
+      const errorText = await response.text();
+      console.error("[Detection] Python service error:", errorText);
       return NextResponse.json(
-        { error: "Detection service error", details: error },
+        { error: "Detection service error", details: errorText },
         { status: response.status }
       );
     }
 
     const result = await response.json();
-    return NextResponse.json(result);
+    const processingTime = Date.now() - startTime;
+    
+    console.log(`[Detection] Python service returned ${result.objects?.length || 0} objects in ${processingTime}ms`);
+
+    return NextResponse.json({
+      ...result,
+      backend_processing_time_ms: processingTime,
+    });
 
   } catch (error) {
-    console.error("Object detection endpoint error:", error);
+    console.error("[Detection] Error:", error);
     
     // Check if it's a connection error
-    if (error instanceof Error && error.message.includes("ECONNREFUSED")) {
+    if (error instanceof Error && 
+        (error.message.includes("ECONNREFUSED") || error.message.includes("fetch failed"))) {
       return NextResponse.json(
         { 
-          error: "Detection service unavailable",
-          message: "Python detection microservice is not running. Start it with: cd python-detection && start.bat"
+          error: "Python detection service unavailable",
+          message: "Start the Python service: cd python-detection && python main.py",
+          details: "The Python OpenCV detection microservice is not running"
         },
         { status: 503 }
       );
     }
 
     return NextResponse.json(
-      { error: "Failed to process detection request" },
+      { error: "Failed to process detection request", details: String(error) },
       { status: 500 }
     );
   }
 }
 
 export async function GET() {
-  // Check if Python service is available
+  // Check Python service health
   try {
-    const response = await fetch(`${PYTHON_SERVICE_URL}/health`);
+    const response = await fetch(`${PYTHON_SERVICE_URL}/health`, {
+      method: "GET",
+    });
     const health = await response.json();
     
     return NextResponse.json({
       endpoint: "/api/detect/objects",
       method: "POST",
-      description: "General object detection with colorblind-aware color analysis",
-      python_service: health
+      description: "Object detection with OpenCV color analysis for colorblind users",
+      python_service: {
+        url: PYTHON_SERVICE_URL,
+        ...health
+      }
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json({
       endpoint: "/api/detect/objects",
       method: "POST",
-      description: "General object detection with colorblind-aware color analysis",
-      python_service: { status: "unavailable" }
+      description: "Object detection with OpenCV color analysis for colorblind users",
+      python_service: {
+        url: PYTHON_SERVICE_URL,
+        status: "unavailable",
+        message: "Start with: cd python-detection && python main.py"
+      }
     });
   }
 }

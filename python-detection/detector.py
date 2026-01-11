@@ -133,13 +133,13 @@ class ObjectDetector:
         """Check if model is loaded"""
         return self.net is not None
     
-    def detect(self, frame: np.ndarray, confidence_threshold: float = 0.5) -> list[dict]:
+    def detect(self, frame: np.ndarray, confidence_threshold: float = 0.10) -> list[dict]:
         """
         Detect objects in frame
         
         Args:
             frame: BGR image as numpy array
-            confidence_threshold: Minimum confidence for detection
+            confidence_threshold: Minimum confidence for detection (default 0.10 for maximum recall)
             
         Returns:
             List of detected objects with bbox, label, and confidence
@@ -149,6 +149,7 @@ class ObjectDetector:
             return []
         
         height, width = frame.shape[:2]
+        logger.info(f"Frame size: {width}x{height}")
         
         # Create blob from image
         blob = cv2.dnn.blobFromImage(
@@ -190,11 +191,23 @@ class ObjectDetector:
                     class_ids.append(class_id)
         
         # Apply Non-Maximum Suppression
+        if len(boxes) == 0:
+            return []
+            
         indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence_threshold, 0.4)
         
+        # Handle empty indices
+        if indices is None or len(indices) == 0:
+            return []
+        
         detections = []
+        # NMSBoxes returns different formats depending on OpenCV version
+        # Flatten to handle both cases
+        if isinstance(indices, np.ndarray):
+            indices = indices.flatten()
+        
         for i in indices:
-            idx = i if isinstance(i, int) else i[0]
+            idx = int(i)
             label = self.classes[class_ids[idx]]
             
             x, y, w, h = boxes[idx]
@@ -221,3 +234,69 @@ class ObjectDetector:
         detections.sort(key=lambda x: priority_order.get(x["priority"], 4))
         
         return detections
+
+    def detect_color_regions(self, frame: np.ndarray, min_area: int = 2000) -> list[dict]:
+        """
+        Detect significant color regions in the frame as fallback when YOLO finds nothing.
+        This ensures we always have something to show bounding boxes on.
+        
+        Args:
+            frame: BGR image
+            min_area: Minimum area for a region to be considered
+            
+        Returns:
+            List of detected color regions with bounding boxes
+        """
+        height, width = frame.shape[:2]
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        
+        # Color ranges to detect
+        color_ranges = {
+            "red": [((0, 70, 50), (10, 255, 255)), ((170, 70, 50), (180, 255, 255))],
+            "orange": [((10, 100, 100), (25, 255, 255))],
+            "yellow": [((25, 100, 100), (35, 255, 255))],
+            "green": [((35, 70, 50), (85, 255, 255))],
+            "blue": [((85, 70, 50), (130, 255, 255))],
+            "purple": [((130, 70, 50), (160, 255, 255))],
+            "pink": [((160, 70, 50), (170, 255, 255))],
+        }
+        
+        detections = []
+        
+        for color_name, ranges in color_ranges.items():
+            # Combine masks for colors with multiple ranges (like red)
+            mask = None
+            for lower, upper in ranges:
+                lower = np.array(lower, dtype=np.uint8)
+                upper = np.array(upper, dtype=np.uint8)
+                color_mask = cv2.inRange(hsv, lower, upper)
+                mask = color_mask if mask is None else cv2.bitwise_or(mask, color_mask)
+            
+            # Find contours
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if area > min_area:
+                    x, y, w, h = cv2.boundingRect(contour)
+                    
+                    # Skip if too small or too large (probably background)
+                    if w < 30 or h < 30:
+                        continue
+                    if w > width * 0.8 or h > height * 0.8:
+                        continue
+                    
+                    confidence = min(area / 50000, 0.9)  # Larger area = higher confidence
+                    
+                    detections.append({
+                        "label": f"{color_name} object",
+                        "confidence": confidence,
+                        "bbox": (x, y, w, h),
+                        "priority": "low",
+                        "color_relevant": True,
+                        "detected_color": color_name
+                    })
+        
+        # Sort by area (largest first) and take top 5
+        detections.sort(key=lambda x: x["bbox"][2] * x["bbox"][3], reverse=True)
+        return detections[:5]

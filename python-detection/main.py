@@ -62,7 +62,7 @@ class DetectionRequest(BaseModel):
     """Request model for detection endpoint"""
     image: str  # Base64 encoded image
     colorblindness_type: str = "normal"  # User's colorblindness type
-    min_confidence: float = 0.5  # Minimum confidence threshold
+    min_confidence: float = 0.15  # Minimum confidence threshold (low for maximum recall)
 
 
 class BoundingBox(BaseModel):
@@ -106,11 +106,21 @@ def decode_base64_image(base64_string: str) -> np.ndarray:
     if "," in base64_string:
         base64_string = base64_string.split(",")[1]
     
+    # Log base64 info
+    logger.info(f"Base64 length: {len(base64_string)}")
+    logger.info(f"Base64 prefix: {base64_string[:30]}...")
+    
     # Decode base64
     image_data = base64.b64decode(base64_string)
+    logger.info(f"Decoded bytes: {len(image_data)}")
     
     # Convert to PIL Image
     pil_image = Image.open(BytesIO(image_data))
+    logger.info(f"PIL image mode: {pil_image.mode}, size: {pil_image.size}")
+    
+    # Convert to RGB if necessary (handle RGBA, L, etc.)
+    if pil_image.mode != 'RGB':
+        pil_image = pil_image.convert('RGB')
     
     # Convert to OpenCV format (BGR)
     cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
@@ -125,6 +135,46 @@ async def health_check():
         status="healthy",
         model_loaded=detector is not None and detector.is_loaded()
     )
+
+
+@app.get("/test-detection")
+async def test_detection():
+    """Test detection with a sample image to verify YOLO is working"""
+    import urllib.request
+    
+    if detector is None:
+        return {"error": "Detector not initialized"}
+    
+    try:
+        # Download a test image from the web
+        test_url = "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=640"
+        logger.info(f"Downloading test image from: {test_url}")
+        
+        with urllib.request.urlopen(test_url, timeout=10) as response:
+            image_data = response.read()
+        
+        # Decode to OpenCV format
+        nparr = np.frombuffer(image_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return {"error": "Failed to decode test image"}
+        
+        h, w = frame.shape[:2]
+        logger.info(f"Test image size: {w}x{h}")
+        
+        # Run detection
+        detections = detector.detect(frame, 0.15)
+        
+        return {
+            "success": True,
+            "image_size": f"{w}x{h}",
+            "num_detections": len(detections),
+            "detections": [{"label": d["label"], "confidence": round(d["confidence"], 3)} for d in detections]
+        }
+    except Exception as e:
+        logger.error(f"Test detection error: {e}")
+        return {"error": str(e)}
 
 
 @app.post("/detect", response_model=DetectionResponse)
@@ -142,6 +192,19 @@ async def detect_objects(request: DetectionRequest):
         # Decode image
         frame = decode_base64_image(request.image)
         frame_height, frame_width = frame.shape[:2]
+        logger.info(f"Decoded frame: {frame_width}x{frame_height}")
+        
+        # Check if frame is too small - YOLO needs reasonable size
+        if frame_width < 100 or frame_height < 100:
+            logger.warning(f"Frame too small: {frame_width}x{frame_height}")
+            return DetectionResponse(
+                success=True,
+                objects=[],
+                frame_width=frame_width,
+                frame_height=frame_height,
+                processing_time_ms=0,
+                alert_message=None
+            )
         
         # Parse colorblindness type
         try:
@@ -149,8 +212,17 @@ async def detect_objects(request: DetectionRequest):
         except ValueError:
             cb_type = ColorBlindnessType.NORMAL
         
-        # Run object detection
+        # Run object detection with very low threshold
+        logger.info(f"Running detection with min_confidence={request.min_confidence}")
         detections = detector.detect(frame, request.min_confidence)
+        logger.info(f"YOLO detections: {len(detections)} objects found")
+        
+        # If YOLO finds nothing, use color region detection as fallback
+        # This ensures we ALWAYS have something to show bounding boxes on
+        if len(detections) == 0:
+            logger.info("No YOLO detections, falling back to color region detection")
+            detections = detector.detect_color_regions(frame, min_area=1500)
+            logger.info(f"Color region detections: {len(detections)} regions found")
         
         # Analyze colors and filter for colorblind relevance
         detected_objects = []
@@ -158,6 +230,17 @@ async def detect_objects(request: DetectionRequest):
         
         for det in detections:
             x, y, w, h = det["bbox"]
+            logger.info(f"  - {det['label']} at ({x},{y},{w},{h}) conf={det['confidence']:.2f}")
+            
+            # Validate and clamp bounding box to frame dimensions
+            x = max(0, min(x, frame_width - 1))
+            y = max(0, min(y, frame_height - 1))
+            w = max(1, min(w, frame_width - x))
+            h = max(1, min(h, frame_height - y))
+            
+            # Skip if bounding box is too small
+            if w < 5 or h < 5:
+                continue
             
             # Extract region of interest for color analysis
             roi = frame[y:y+h, x:x+w]

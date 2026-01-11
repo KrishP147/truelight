@@ -53,20 +53,34 @@ Say "Hey TrueLight" or "Sierra" followed by:
 
 ```
 delta/
-├── mobile/                 # Expo React Native app
-│   ├── app/               # Expo Router screens
-│   │   ├── index.tsx     # Welcome/onboarding
-│   │   ├── test.tsx      # Color vision assessment
-│   │   └── camera.tsx    # Main detection screen
-│   ├── components/        # Reusable UI components
-│   ├── services/          # API, speech, storage
-│   └── constants/         # Accessibility config
+├── python-detection/      # Python FastAPI detection service
+│   ├── main.py           # FastAPI server endpoints
+│   ├── detector.py       # YOLO + OpenCV detection logic
+│   ├── requirements.txt  # Python dependencies
+│   └── models/           # YOLOv3-tiny model files
 │
-└── backend/               # Next.js API
-    ├── app/api/          # API routes
-    │   ├── detect/       # Signal detection endpoint
-    │   └── health/       # Health check
-    └── lib/              # Detection logic
+├── backend/              # Next.js API proxy
+│   ├── app/api/         # API routes
+│   │   ├── detect/      # Detection endpoint (proxies to Python)
+│   │   ├── health/      # Health check
+│   │   └── tts/         # ElevenLabs TTS (optional)
+│   └── lib/             # Utility functions
+│
+└── mobile/              # Expo React Native app
+    ├── app/            # Expo Router screens
+    │   ├── index.tsx  # Welcome/onboarding
+    │   ├── test.tsx   # Color vision assessment
+    │   └── camera.tsx # Main detection screen
+    ├── components/     # Reusable UI components
+    │   ├── CameraView.tsx          # Camera & frame capture
+    │   ├── BoundingBoxOverlay.tsx  # Visual detection overlay
+    │   └── SignalDisplay.tsx       # Traffic light UI
+    ├── services/       # Business logic
+    │   ├── api.ts              # Backend API client
+    │   ├── MLService.ts        # Detection orchestration
+    │   ├── aiAssistant.ts      # Gemini voice commands
+    │   └── AudioAlertService.ts # TTS & alerts
+    └── constants/      # Accessibility config
 ```
 
 ## Technical Approach
@@ -94,78 +108,242 @@ For this hackathon, we chose color-based detection over machine learning because
 - 2-second minimum between announcements of same state
 - Immediate announcement of new states
 
-## How to Run the Demo
+## How to Run Locally
 
 ### Prerequisites
 
-- Node.js 18+
-- Expo Go app on your phone
-- Both devices on same network
+- **Node.js 18+** and npm
+- **Python 3.8+** with pip
+- **Expo Go** app installed on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
+- Computer and phone on the **same Wi-Fi network**
 
-### 1. Start the Backend
+### Environment Variables Setup
+
+#### 1. Backend Environment Variables
+
+Create `backend/.env`:
+```bash
+# Python Detection Service URL
+PYTHON_DETECTION_URL=http://localhost:8000
+
+# Optional: ElevenLabs for natural TTS (optional - falls back to expo-speech)
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+
+# Optional: Roboflow for additional object detection (optional - not currently used)
+ROBOFLOW_API_KEY=your_roboflow_api_key_here
+
+# JWT Secret (change in production)
+JWT_SECRET=your-secret-key-change-this-in-production
+```
+
+#### 2. Mobile Environment Variables
+
+Create `mobile/.env`:
+```bash
+# Your computer's local IP address (see instructions below)
+EXPO_PUBLIC_API_URL=http://YOUR_LOCAL_IP:3000
+
+# Google Gemini API for AI Assistant "Sierra" (optional)
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+**To find your local IP address:**
+
+**Windows:**
+```bash
+ipconfig
+# Look for "IPv4 Address" under your Wi-Fi adapter (e.g., 192.168.1.100)
+```
+
+**macOS/Linux:**
+```bash
+ifconfig | grep "inet "
+# or
+ipconfig getifaddr en0
+```
+
+**Example:** If your IP is `192.168.1.100`, set:
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.1.100:3000
+```
+
+### Running the Application
+
+You need to start **three services** in separate terminals:
+
+#### Terminal 1: Python Detection Service
+
+```bash
+cd python-detection
+
+# Install Python dependencies (first time only)
+pip install -r requirements.txt
+
+# Download YOLO model (first time only - ~240MB)
+# The model will auto-download on first run, or manually:
+# Place yolov3-tiny.weights and yolov3-tiny.cfg in models/
+
+# Start the Python detection service
+python main.py
+```
+
+The Python service runs at `http://localhost:8000`
+
+**Verify it's working:**
+```bash
+curl http://localhost:8000/health
+# Should return: {"status": "healthy", "yolo_loaded": true}
+```
+
+#### Terminal 2: Next.js Backend
 
 ```bash
 cd backend
+
+# Install dependencies (first time only)
 npm install
+
+# Start the Next.js backend
 npm run dev
 ```
 
-The server runs at `http://localhost:3000`
+The backend runs at `http://localhost:3000`
 
-### 2. Configure Mobile App
-
-Find your computer's local IP address:
+**Verify it's working:**
 ```bash
-# macOS
-ipconfig getifaddr en0
-
-# Windows
-ipconfig
+curl http://localhost:3000/api/health
+# Should return: {"status": "ok", "timestamp": "..."}
 ```
 
-Create a `.env` file in the mobile folder:
-```
-EXPO_PUBLIC_API_URL=http://YOUR_IP:3000
-```
-
-### 3. Start the Mobile App
+#### Terminal 3: Expo Mobile App
 
 ```bash
 cd mobile
+
+# Install dependencies (first time only)
 npm install
-npx expo start
+
+# Start Expo with cache cleared
+npx expo start --clear
 ```
 
-Scan the QR code with Expo Go on your phone.
+**On your phone:**
+1. Open **Expo Go** app
+2. Scan the QR code shown in the terminal
+3. Wait for the app to load
 
-### 4. Using the App
+### First-Time Setup
 
-1. Complete the quick vision assessment (30 seconds)
-2. Point your camera at a traffic signal
-3. Listen for audio announcements
+When you first run the app:
+
+1. **Grant Permissions**: Allow camera and microphone access
+2. **Complete Vision Test** (optional): Take the quick color vision assessment
+3. **Start Detection**: Navigate to the camera screen
+
+### Using the App
+
+1. Point your camera at objects or traffic signals
+2. Bounding boxes will appear around detected objects
+3. Audio alerts will announce detected hazards
+4. Use voice commands: "Hey TrueLight" or "Sierra" + your question
+
+## Troubleshooting
+
+### Python Service Issues
+
+**Problem:** "YOLO model not loaded"
+```bash
+# Download the YOLOv3-tiny model manually
+cd python-detection/models
+# Download from: https://pjreddie.com/media/files/yolov3-tiny.weights
+# And: https://github.com/pjreddie/darknet/blob/master/cfg/yolov3-tiny.cfg
+```
+
+**Problem:** Port 8000 already in use
+```bash
+# Windows: Find and kill the process
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# macOS/Linux:
+lsof -ti:8000 | xargs kill -9
+```
+
+### Backend Issues
+
+**Problem:** Can't connect to Python service
+- Ensure Python service is running on port 8000
+- Check `PYTHON_DETECTION_URL` in `backend/.env`
+- Verify with: `curl http://localhost:8000/health`
+
+**Problem:** Port 3000 already in use
+```bash
+# Change the port in package.json or kill the process
+# Windows:
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+### Mobile App Issues
+
+**Problem:** "Network request failed"
+- Verify phone and computer are on the **same Wi-Fi network**
+- Check that `EXPO_PUBLIC_API_URL` uses your computer's **local IP** (not localhost)
+- Disable any VPN or firewall blocking port 3000
+- Try pinging your computer from your phone
+
+**Problem:** No detections showing
+- Check Python service logs for errors
+- Ensure camera permissions are granted
+- Point camera at well-lit, clear objects
+- Check mobile app console logs in Expo
+
+**Problem:** No audio alerts
+- Ensure microphone permission is granted (for voice commands)
+- Check device volume
+- Try toggling voice provider in settings
+
+### General Tips
+
+- **Reload app**: Press `r` in the Expo terminal
+- **Clear cache**: Use `npx expo start --clear`
+- **Check logs**: Look at all three terminal windows for errors
+- **Test API**: Use curl commands above to verify services
 
 ## Demo Tips
 
 - For indoor testing, display traffic light images on a monitor
 - Ensure good lighting for best detection
-- Hold phone steady and point directly at the signal
-- The app announces "Scanning..." when looking for signals
+- Hold phone steady and point directly at objects
+- The app processes frames every 1.5-2 seconds
+- Bounding boxes appear in real-time as objects are detected
 
 ## Tech Stack
 
-- **Mobile**: Expo, React Native, TypeScript, Expo Camera, Expo Speech
-- **Backend**: Next.js 15, TypeScript, App Router, ElevenLabs TTS
-- **AI**: Google Gemini Vision (scene analysis), Roboflow YOLO (object detection)
-- **Detection**: Roboflow traffic light model + COCO object detection
-- **Deployment**: Vercel (backend), Expo Go (mobile)
+- **Mobile**: Expo SDK 51+, React Native, TypeScript, Expo Camera, Expo Speech
+- **Backend**: Next.js 15, TypeScript, App Router
+- **Detection Service**: Python 3.8+, FastAPI, OpenCV, YOLOv3-tiny, NumPy
+- **AI**: Google Gemini 2.5 Flash (scene analysis via voice commands)
+- **Audio**: Expo Speech (primary), ElevenLabs TTS (optional)
+- **State Management**: Zustand + AsyncStorage
+- **Deployment**: Local development (production: Vercel for backend, Expo Go for mobile)
 
-## Services Required
+## Required API Keys (Optional)
 
-| Service | Purpose | Free Tier |
-|---------|---------|-----------|
-| [Roboflow](https://roboflow.com) | Object detection | 10,000 calls/month |
-| [Google AI Studio](https://aistudio.google.com) | Gemini AI assistant | Free tier available |
-| [ElevenLabs](https://elevenlabs.io) | Natural TTS | 10,000 chars/month |
+All features work without API keys, but these enhance the experience:
+
+| Service | Purpose | How to Get | Free Tier | Required? |
+|---------|---------|------------|-----------|-----------|
+| [Google AI Studio](https://aistudio.google.com) | AI Assistant "Sierra" | Create project, get API key | Free tier available | No - voice features disabled without it |
+| [ElevenLabs](https://elevenlabs.io) | Natural TTS voice | Sign up, get API key | 10,000 chars/month | No - falls back to Expo Speech |
+| [Roboflow](https://roboflow.com) | Additional object detection | Create account, get API key | 10,000 calls/month | No - currently not used |
+
+**Without API keys:**
+- ✅ Object detection works (YOLO + OpenCV)
+- ✅ Audio alerts work (Expo Speech)
+- ✅ Bounding boxes work
+- ❌ Voice commands disabled ("Hey TrueLight")
+- ❌ Natural voice disabled (uses robotic TTS)
 
 ## Hackathon Tradeoffs
 
