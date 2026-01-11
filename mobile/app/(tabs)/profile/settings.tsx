@@ -18,6 +18,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SIZES } from "../../../constants/accessibility";
 import {
@@ -26,8 +27,10 @@ import {
   TransportMode,
 } from "../../../store/useAppStore";
 import { speak } from "../../../services/speech";
+import { logout } from "../../../services/auth";
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const {
     alertSettings,
     transportSettings,
@@ -38,6 +41,25 @@ export default function SettingsScreen() {
     setDetectionSettings,
     resetProfile,
   } = useAppStore();
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            speak("Logging out");
+            await logout();
+            router.replace("/login");
+          },
+        },
+      ]
+    );
+  };
 
   const handleResetProfile = () => {
     Alert.alert(
@@ -355,7 +377,16 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Version */}
+        {/* Account */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </Pressable>
+        </View>
+
+        {/* Version */}}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Delta v1.0.0</Text>
           <Text style={styles.footerText}>Your data stays on your device</Text>
@@ -545,6 +576,17 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: COLORS.red,
+    fontSize: SIZES.textSmall,
+    fontWeight: "600",
+  },
+  logoutButton: {
+    backgroundColor: COLORS.red,
+    padding: SIZES.spacingMedium,
+    borderRadius: SIZES.borderRadius,
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: COLORS.textPrimary,
     fontSize: SIZES.textSmall,
     fontWeight: "600",
   },
