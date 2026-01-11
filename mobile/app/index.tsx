@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
   useEffect(() => {
     // Skip auth check - app works without authentication
     // Users can optionally login later for cloud sync features
-    
+
     // Check onboarding status
     const completed = isOnboardingComplete();
     setHasCompletedSetup(completed);
@@ -199,16 +199,7 @@ export default function WelcomeScreen() {
         </Text>
         <Text style={styles.subtitle}>Color Assistant</Text>
 
-        <View style={styles.descriptionCard}>
-          <Text style={styles.description}>
-            True Light helps you navigate traffic signals safely by detecting lights
-            and providing clear audio feedback.
-          </Text>
-          <Text style={styles.description}>
-            Point your camera at traffic signals to hear announcements like "Red
-            light - Stop" or "Green light - Safe to proceed."
-          </Text>
-        </View>
+
 
         <Text style={styles.sectionTitle}>Select your vision type</Text>
 
