@@ -46,7 +46,7 @@ export async function analyzeScene(
   }
 ): Promise<SceneAnalysis> {
   const startTime = Date.now();
-  
+
   // Get user's color profile for contextual descriptions
   const colorProfile = getColorProfile(colorblindType);
   const problematicColors = colorProfile.problematicColors.join(', ');
@@ -96,7 +96,7 @@ Be concise and focus on safety-relevant information. Speak as if directly talkin
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
+
     // Parse the response into structured format
     return parseSceneAnalysis(text, Date.now() - startTime);
   } catch (error) {
@@ -121,10 +121,10 @@ export async function askQuestion(
   colorblindType: ColorblindnessType = 'unknown'
 ): Promise<AIResponse> {
   const startTime = Date.now();
-  
+
   const colorProfile = getColorProfile(colorblindType);
   
-  const systemPrompt = `You are TrueLight, a helpful AI assistant for a person${colorblindType !== 'normal' ? ` with ${colorblindType} color blindness` : ''}. 
+  const systemPrompt = `You are TrueLight, a helpful AI assistant for a person${colorblindType !== 'normal' ? ` with ${colorblindType} color blindness` : ''}.
 
 Answer questions concisely and clearly. If the question is about something visual${base64Image ? ' (you have an image)' : ' (no image provided)'}, describe what you see in a way that's helpful for the user.
 
@@ -134,7 +134,7 @@ Keep responses brief (1-3 sentences) and actionable.`;
 
   try {
     const parts: any[] = [{ text: `${systemPrompt}\n\nQuestion: ${question}` }];
-    
+
     if (base64Image) {
       parts.push({
         inlineData: {
@@ -164,7 +164,7 @@ Keep responses brief (1-3 sentences) and actionable.`;
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I couldn\'t understand that. Could you rephrase?';
-    
+
     return {
       text: text.trim(),
       confidence: 0.8,
@@ -190,7 +190,7 @@ export function generateObjectDescription(
   if (objects.length === 0) {
     return 'No objects detected in view.';
   }
-  
+
   // Sort by confidence and problematic colors first
   const sorted = [...objects].sort((a, b) => {
     // Prioritize problematic colors
@@ -198,24 +198,24 @@ export function generateObjectDescription(
     if (!a.isProblematicColor && b.isProblematicColor) return 1;
     return b.confidence - a.confidence;
   });
-  
-  // Take top 5 most relevant
-  const top = sorted.slice(0, 5);
-  
+
+  // Take top 3 most relevant
+  const top = sorted.slice(0, 3);
+
   // Generate description
   const problematic = top.filter(o => o.isProblematicColor);
   const normal = top.filter(o => !o.isProblematicColor);
-  
+
   let description = '';
-  
+
   if (problematic.length > 0) {
-    description += `Attention: ${problematic.map(o => o.label).join(', ')}. `;
+    description += `${problematic.map(o => o.label).join(', ')}. `;
   }
-  
+
   if (normal.length > 0) {
-    description += `Also visible: ${normal.map(o => o.label).join(', ')}.`;
+    description += `${normal.map(o => o.label).join(', ')}.`;
   }
-  
+
   return description.trim();
 }
 
@@ -225,43 +225,43 @@ export function generateObjectDescription(
 function parseSceneAnalysis(text: string, processingTimeMs: number): SceneAnalysis {
   // Simple parsing - in production, use structured output from Gemini
   const lines = text.split('\n').filter(l => l.trim());
-  
+
   // Extract key information using simple heuristics
   const description = lines[0] || 'Scene analyzed.';
-  
+
   const objects: string[] = [];
   const hazards: string[] = [];
   const trafficSignals: string[] = [];
   const colorWarnings: string[] = [];
   let suggestedAction = 'Proceed with caution.';
-  
+
   for (const line of lines) {
     const lower = line.toLowerCase();
-    
+
     // Look for traffic signals
     if (lower.includes('traffic light') || lower.includes('signal') || lower.includes('stop sign')) {
       trafficSignals.push(line.replace(/^[-*•]\s*/, '').trim());
     }
-    
+
     // Look for hazards
-    if (lower.includes('hazard') || lower.includes('danger') || lower.includes('caution') || 
-        lower.includes('vehicle') || lower.includes('car') || lower.includes('pedestrian')) {
+    if (lower.includes('hazard') || lower.includes('danger') || lower.includes('caution') ||
+      lower.includes('vehicle') || lower.includes('car') || lower.includes('pedestrian')) {
       hazards.push(line.replace(/^[-*•]\s*/, '').trim());
     }
-    
+
     // Look for action suggestions
-    if (lower.includes('stop') || lower.includes('wait') || lower.includes('proceed') || 
-        lower.includes('go') || lower.includes('safe') || lower.includes('caution')) {
+    if (lower.includes('stop') || lower.includes('wait') || lower.includes('proceed') ||
+      lower.includes('go') || lower.includes('safe') || lower.includes('caution')) {
       suggestedAction = line.replace(/^[-*•]\s*/, '').trim();
     }
-    
+
     // Look for color warnings
     if (lower.includes('red') || lower.includes('green') || lower.includes('yellow') ||
-        lower.includes('orange') || lower.includes('blue')) {
+      lower.includes('orange') || lower.includes('blue')) {
       colorWarnings.push(line.replace(/^[-*•]\s*/, '').trim());
     }
   }
-  
+
   return {
     description,
     objects,
@@ -294,7 +294,7 @@ export function getSafetyTip(
   }
 ): string {
   const tips: string[] = [];
-  
+
   if (conditions.hasTrafficSignal) {
     tips.push('Always verify traffic signals before crossing.');
   }
@@ -307,6 +307,6 @@ export function getSafetyTip(
   if (conditions.isLowLight) {
     tips.push('Low light conditions - proceed carefully.');
   }
-  
+
   return tips.length > 0 ? tips[Math.floor(Math.random() * tips.length)] : '';
 }

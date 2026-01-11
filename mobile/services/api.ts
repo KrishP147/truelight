@@ -324,7 +324,7 @@ function generateAlertMessage(
   const messages: string[] = [];
 
   // Add top alerts
-  for (const obj of sorted.slice(0, 3)) {
+  for (const obj of sorted.slice(0, 2)) {
     const colorInfo = obj.colors.length > 0 ? `${obj.colors[0]} ` : '';
     messages.push(`${colorInfo}${obj.label}`);
   }

@@ -72,6 +72,8 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const frameNumberRef = useRef(0); // Track frame number for motion detection
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSpokenMessage = useRef<string>("");
+  const lastDetailsSpokenTime = useRef<number>(0);
 
   // Expose recording controls to parent components
   useImperativeHandle(ref, () => ({
@@ -233,7 +235,7 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
       const frameArea = imageDimensions.width * imageDimensions.height;
       const bboxArea = obj.bbox.width * obj.bbox.height;
       const relativeSize = bboxArea / frameArea;
-      
+
       let size: "large" | "medium" | "small";
       if (relativeSize > 0.05) {
         size = "large";
@@ -246,7 +248,7 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
       const centerX = obj.bbox.x + obj.bbox.width / 2;
       const frameWidth = imageDimensions.width;
       let location: "left" | "center" | "right";
-      
+
       if (centerX < frameWidth * 0.3) {
         location = "left";
       } else if (centerX > frameWidth * 0.7) {
@@ -263,7 +265,7 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
     });
 
     console.log('[CameraView] 🔊 Scene description:', objectsForDescription);
-    
+
     try {
       await speakSceneDescription(objectsForDescription);
     } catch (e) {
@@ -336,14 +338,14 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
         if (colorblindType === 'low_vision') {
           // LOW VISION MODE: Proximity-based alerts (size = closeness)
           const frameArea = (result.imageWidth || imageDimensions.width) * (result.imageHeight || imageDimensions.height);
-          
+
           for (const obj of result.detectedObjects) {
             const bboxArea = obj.bbox.width * obj.bbox.height;
             const relativeSize = bboxArea / frameArea;
-            
+
             // Determine distance category based on object size
             let distance: "very close" | "close" | "moderate" | "far" | null = null;
-            
+
             if (relativeSize > 0.10) {
               distance = "very close"; // >10% of frame = very close
             } else if (relativeSize > 0.05) {
@@ -353,14 +355,14 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
             } else if (relativeSize > 0.005) {
               distance = "far"; // >0.5% = far but notable
             }
-            
+
             // Only alert for objects that are close enough to matter
             if (distance && (distance === "very close" || distance === "close" || obj.alertPriority === "critical")) {
               // Determine direction from bbox position
               const centerX = obj.bbox.x + obj.bbox.width / 2;
               const frameWidth = result.imageWidth || imageDimensions.width;
               let direction: string | undefined;
-              
+
               if (centerX < frameWidth * 0.3) {
                 direction = "left";
               } else if (centerX > frameWidth * 0.7) {
@@ -368,15 +370,24 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
               } else {
                 direction = "ahead";
               }
-              
-              console.log(`[CameraView] 🔊 Low vision alert: ${obj.label} ${distance} ${direction} (${(relativeSize * 100).toFixed(1)}% of frame)`);
-              
-              try {
-                await speakProximityAlert(obj.label, distance, direction);
-              } catch (e) {
-                console.warn("Proximity alert failed:", e);
+
+              // Construct unique key for this alert
+              const alertKey = `${obj.label}-${distance}-${direction || 'unknown'}`;
+              const now = Date.now();
+
+              // Repeat if different message OR same message after 2 seconds
+              if (alertKey !== lastSpokenMessage.current || now - lastDetailsSpokenTime.current > 2000) {
+                console.log(`[CameraView] 🔊 Low vision alert: ${obj.label} ${distance} ${direction} (${(relativeSize * 100).toFixed(1)}% of frame)`);
+
+                try {
+                  await speakProximityAlert(obj.label, distance, direction as any);
+                  lastSpokenMessage.current = alertKey;
+                  lastDetailsSpokenTime.current = now;
+                } catch (e) {
+                  console.warn("Proximity alert failed:", e);
+                }
               }
-              
+
               // Only alert the most urgent object to avoid spam
               break;
             }
@@ -391,14 +402,20 @@ export const CameraViewComponent = forwardRef<CameraViewHandle, Props>(function 
           if (problematicObjects.length > 0 && result.confidence >= alertSettings.minConfidenceToAlert) {
             // Generate alert message for problematic colors
             const alertMessage = generateColorAlert(problematicObjects);
+            const now = Date.now();
 
-            try {
-              // Use ElevenLabs for more natural voice
-              await speakWithElevenLabs(alertMessage);
-            } catch (e) {
-              // Fallback to alert speech (always plays, ignores alertsOnlyMode)
-              console.warn("ElevenLabs failed, using fallback:", e);
-              speakAlert(alertMessage);
+            // Repeat if different message OR same message after 2 seconds
+            if (alertMessage !== lastSpokenMessage.current || now - lastDetailsSpokenTime.current > 2000) {
+              try {
+                // Use ElevenLabs for more natural voice
+                await speakWithElevenLabs(alertMessage);
+              } catch (e) {
+                // Fallback to alert speech (always plays, ignores alertsOnlyMode)
+                console.warn("ElevenLabs failed, using fallback:", e);
+                speakAlert(alertMessage);
+              }
+              lastSpokenMessage.current = alertMessage;
+              lastDetailsSpokenTime.current = now;
             }
           }
         }

@@ -130,14 +130,14 @@ export async function speakSignalState(
  */
 function speakWithExpo(message: string, state?: SignalState): void {
   let pitch = 1.0;
-  let rate = 1.1;
+  let rate = 0.9;
 
   // Adjust voice characteristics based on state
   if (state === "red") {
     pitch = 0.9; // Lower for urgency
-    rate = 1.0; // Slower for clarity
+    rate = 0.8; // Slower for clarity
   } else if (state === "yellow") {
-    rate = 1.2; // Faster for warning
+    rate = 1.0; // Faster for warning
   }
 
   Speech.speak(message, {
@@ -281,13 +281,13 @@ export async function speakHazardAlert(
   switch (urgency) {
     case "critical":
       pitch = 1.1;
-      rate = 1.3; // Fast and urgent
+      rate = 1.1; // Fast and urgent
       break;
     case "warning":
-      rate = 1.1;
+      rate = 0.9;
       break;
     case "info":
-      rate = 1.0;
+      rate = 0.85;
       break;
   }
 
@@ -316,22 +316,22 @@ export async function speakProximityAlert(
       message = `Warning! ${objectLabel} very close`;
       if (direction) message += ` ${direction}`;
       pitch = 1.2;
-      rate = 1.4; // Very fast and urgent
+      rate = 1.1; // Very fast and urgent
       break;
     case "close":
       message = `${objectLabel} approaching`;
       if (direction) message += ` on ${direction}`;
       pitch = 1.1;
-      rate = 1.2;
+      rate = 1.0;
       break;
     case "moderate":
       message = `${objectLabel} ${direction || "ahead"}`;
-      rate = 1.1;
+      rate = 0.9;
       break;
     case "far":
       message = `${objectLabel} in distance`;
       if (direction) message += ` ${direction}`;
-      rate = 1.0;
+      rate = 0.85;
       break;
   }
 
@@ -356,7 +356,7 @@ export async function speakSceneDescription(
   }
 
   let message = `${objects.length} object${objects.length > 1 ? 's' : ''} detected. `;
-  
+
   // Describe top 3 most important objects
   const topObjects = objects.slice(0, 3);
   topObjects.forEach((obj, index) => {
@@ -368,7 +368,7 @@ export async function speakSceneDescription(
   Speech.speak(message, {
     language: "en-US",
     pitch: 1.0,
-    rate: 1.0,
+    rate: 0.85,
   });
 }
 

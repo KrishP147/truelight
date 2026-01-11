@@ -5,10 +5,10 @@
  * Uses dark theme for accessibility and reduced eye strain.
  */
 
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
 import { COLORS } from '../constants/accessibility';
 import { AuthProvider } from '../contexts/AuthContext';
 import { useAppStore } from '../store/useAppStore';
@@ -31,7 +31,6 @@ export default function RootLayout() {
   useEffect(() => {
     setAlertsOnlyMode(alertSettings.alertsOnlyAudio);
   }, [alertSettings.alertsOnlyAudio]);
-
   return (
     <AuthProvider>
       <View style={styles.container}>
@@ -54,13 +53,6 @@ export default function RootLayout() {
         >
         <Stack.Screen
           name="index"
-          options={{
-            title: 'True Light',
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="home"
           options={{
             title: 'True Light',
             headerShown: false,
@@ -92,7 +84,7 @@ export default function RootLayout() {
         <Stack.Screen
           name="camera"
           options={{
-            title: 'Dashcam',
+            title: 'True Light',
             headerShown: false,
           }}
         />
