@@ -25,14 +25,14 @@ interface Props {
 const BRACKET_COLOR = '#FF6B35'; // Orange - used for all detected objects, motion, and traffic hazards
 
 // Animated bracket component for each detected object
-function TargetBracket({ 
-  targetObj, 
-  left, 
-  top, 
-  boxWidth, 
+function TargetBracket({
+  targetObj,
+  left,
+  top,
+  boxWidth,
   boxHeight,
   isActive
-}: { 
+}: {
   targetObj: DetectedObject | TrackedObject;
   left: number;
   top: number;
@@ -42,11 +42,11 @@ function TargetBracket({
 }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const flashAnim = useRef(new Animated.Value(1)).current;
-  
+
   const isTracked = 'isMoving' in targetObj;
   const isMoving = isTracked && (targetObj as TrackedObject).isMoving;
   const isAlert = targetObj.isProblematicColor;
-  
+
   // Always use orange brackets for all objects (motion, objects, traffic hazards)
   const bracketColor = BRACKET_COLOR;
 
@@ -123,34 +123,34 @@ function TargetBracket({
         </View>
       )}
       {/* Top-left bracket */}
-      <View style={[styles.corner, styles.cornerTL, { 
+      <View style={[styles.corner, styles.cornerTL, {
         borderColor: bracketColor,
         borderTopWidth: thickness,
         borderLeftWidth: thickness,
         width: actualCornerSize,
         height: actualCornerSize,
       }]} />
-      
+
       {/* Top-right bracket */}
-      <View style={[styles.corner, styles.cornerTR, { 
+      <View style={[styles.corner, styles.cornerTR, {
         borderColor: bracketColor,
         borderTopWidth: thickness,
         borderRightWidth: thickness,
         width: actualCornerSize,
         height: actualCornerSize,
       }]} />
-      
+
       {/* Bottom-left bracket */}
-      <View style={[styles.corner, styles.cornerBL, { 
+      <View style={[styles.corner, styles.cornerBL, {
         borderColor: bracketColor,
         borderBottomWidth: thickness,
         borderLeftWidth: thickness,
         width: actualCornerSize,
         height: actualCornerSize,
       }]} />
-      
+
       {/* Bottom-right bracket */}
-      <View style={[styles.corner, styles.cornerBR, { 
+      <View style={[styles.corner, styles.cornerBR, {
         borderColor: bracketColor,
         borderBottomWidth: thickness,
         borderRightWidth: thickness,
@@ -181,9 +181,16 @@ export function BoundingBoxOverlay({
 }: Props) {
   if (!objects || objects.length === 0) return null;
 
-  // Calculate scale factors
-  const scaleX = containerWidth / imageWidth;
-  const scaleY = containerHeight / imageHeight;
+
+  // Calculate scale factors to simulate "cover" mode (what the camera preview usually does)
+  // This means the image is scaled to fill the container, cropping what doesn't fit
+  const scale = Math.max(containerWidth / imageWidth, containerHeight / imageHeight);
+
+  // Calculate offsets to center the image
+  const scaledWidth = imageWidth * scale;
+  const scaledHeight = imageHeight * scale;
+  const offsetX = (containerWidth - scaledWidth) / 2;
+  const offsetY = (containerHeight - scaledHeight) / 2;
 
   // Ensure activeTargetIndex is within bounds
   const safeActiveIndex = Math.max(0, Math.min(activeTargetIndex, objects.length - 1));
@@ -191,11 +198,11 @@ export function BoundingBoxOverlay({
   return (
     <View style={[styles.container, { width: containerWidth, height: containerHeight }]}>
       {objects.map((obj, index) => {
-        // Scale coordinates to container dimensions
-        const left = obj.bbox.x * scaleX;
-        const top = obj.bbox.y * scaleY;
-        const width = obj.bbox.width * scaleX;
-        const height = obj.bbox.height * scaleY;
+        // Scale coordinates to container dimensions with "cover" logic
+        const left = obj.bbox.x * scale + offsetX;
+        const top = obj.bbox.y * scale + offsetY;
+        const width = obj.bbox.width * scale;
+        const height = obj.bbox.height * scale;
 
         // Skip very small detections
         if (width < 20 || height < 20) return null;
@@ -214,7 +221,7 @@ export function BoundingBoxOverlay({
           />
         );
       })}
-      
+
       {/* Object count indicator */}
       <View style={styles.countBadge}>
         <Text style={styles.countText}>

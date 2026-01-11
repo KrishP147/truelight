@@ -136,19 +136,19 @@ const defaultTransportSettings: TransportSettings = {
   modeConfig: {
     walking: {
       alertIntervalMs: 5000,
-      frameProcessingIntervalMs: 1000,
+      frameProcessingIntervalMs: 250,
     },
     biking: {
       alertIntervalMs: 3000,
-      frameProcessingIntervalMs: 800,
+      frameProcessingIntervalMs: 200,
     },
     driving: {
       alertIntervalMs: 1500,
-      frameProcessingIntervalMs: 500,
+      frameProcessingIntervalMs: 125,
     },
     passenger: {
       alertIntervalMs: 10000,
-      frameProcessingIntervalMs: 2000,
+      frameProcessingIntervalMs: 500,
     },
   },
 };

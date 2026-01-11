@@ -83,14 +83,14 @@ export async function detectSignal(
   colorblindType: ColorblindnessType = 'unknown'
 ): Promise<DetectionResponse> {
   console.log(`[Detection] Starting detection for ${colorblindType} user`);
-  
+
   // Try Python service methods - NO Roboflow fallback
   // Python service provides accurate color analysis essential for colorblind users
   const methods = [
     { name: 'Backend Proxy', fn: () => detectViaBackend(base64Image, colorblindType) },
     { name: 'Direct Python', fn: () => detectWithPython(base64Image, colorblindType) },
   ];
-  
+
   for (const method of methods) {
     try {
       console.log(`[Detection] Trying ${method.name}...`);
@@ -101,7 +101,7 @@ export async function detectSignal(
       console.warn(`[Detection] ${method.name} failed:`, error);
     }
   }
-  
+
   // All methods failed - return empty result
   console.error('[Detection] All detection methods failed - is Python service running?');
   console.error('[Detection] Start it with: cd python-detection && python main.py');
@@ -138,7 +138,7 @@ async function detectViaBackend(
       body: JSON.stringify({
         image: base64Image,
         colorblindness_type: colorblindType,
-        min_confidence: 0.15,
+        min_confidence: 0.5,
       }),
       signal: controller.signal,
     });
@@ -151,7 +151,7 @@ async function detectViaBackend(
 
     const data = await response.json();
     return processPythonResponse(data, colorblindType);
-    
+
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
@@ -175,7 +175,7 @@ async function detectWithPython(
       body: JSON.stringify({
         image: base64Image,
         colorblindness_type: colorblindType,
-        min_confidence: 0.25,
+        min_confidence: 0.5,
       }),
       signal: controller.signal,
     });
@@ -188,7 +188,7 @@ async function detectWithPython(
 
     const data = await response.json();
     return processPythonResponse(data, colorblindType);
-    
+
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
@@ -204,10 +204,10 @@ function processPythonResponse(
 ): DetectionResponse {
   const detectedObjects: DetectedObject[] = [];
   const alertObjects: DetectedObject[] = [];
-  
+
   for (let i = 0; i < (data.objects || []).length; i++) {
     const obj = data.objects[i];
-    
+
     const detected: DetectedObject = {
       id: `det-${i}-${Date.now()}`,
       label: formatLabel(obj.label),
@@ -224,18 +224,18 @@ function processPythonResponse(
       alertPriority: mapPriority(obj.priority),
       colorWarning: obj.color_warning,
     };
-    
+
     detectedObjects.push(detected);
-    
+
     // Add to alert list if color is problematic and priority is significant
-    if (detected.isProblematicColor && 
-        ['critical', 'high', 'medium'].includes(detected.alertPriority)) {
+    if (detected.isProblematicColor &&
+      ['critical', 'high', 'medium'].includes(detected.alertPriority)) {
       alertObjects.push(detected);
     }
   }
-  
+
   // Determine traffic light state for compatibility
-  const trafficLight = detectedObjects.find(o => 
+  const trafficLight = detectedObjects.find(o =>
     o.class.includes('traffic') || o.class.includes('light')
   );
   let state: SignalState = 'unknown';
@@ -248,13 +248,13 @@ function processPythonResponse(
 
   // Generate alert message
   const message = generateAlertMessage(alertObjects, detectedObjects.length);
-  
+
   console.log(`[Detection] Processed: ${detectedObjects.length} objects, ${alertObjects.length} alerts`);
 
   return {
     state,
-    confidence: detectedObjects.length > 0 
-      ? Math.max(...detectedObjects.map(o => o.confidence)) 
+    confidence: detectedObjects.length > 0
+      ? Math.max(...detectedObjects.map(o => o.confidence))
       : 0,
     message,
     detectedObjects,
@@ -294,7 +294,7 @@ function formatLabel(label: string): string {
  * Only includes objects with problematic colors
  */
 function generateAlertMessage(
-  alertObjects: DetectedObject[], 
+  alertObjects: DetectedObject[],
   totalObjects: number
 ): string {
   if (alertObjects.length === 0) {
@@ -303,25 +303,25 @@ function generateAlertMessage(
     }
     return 'Scanning...';
   }
-  
+
   // Sort by priority
   const sorted = [...alertObjects].sort((a, b) => {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
     return priorityOrder[a.alertPriority] - priorityOrder[b.alertPriority];
   });
-  
+
   const messages: string[] = [];
-  
+
   // Add top alerts
   for (const obj of sorted.slice(0, 3)) {
     const colorInfo = obj.colors.length > 0 ? `${obj.colors[0]} ` : '';
     messages.push(`${colorInfo}${obj.label}`);
   }
-  
+
   if (messages.length === 0) {
     return `${alertObjects.length} color alert${alertObjects.length > 1 ? 's' : ''}`;
   }
-  
+
   return messages.join(', ');
 }
 
@@ -333,7 +333,7 @@ export async function checkDetectionHealth(): Promise<{
   python: boolean;
 }> {
   const results = { backend: false, python: false };
-  
+
   // Helper for timeout
   const fetchWithTimeout = async (url: string, timeout = 5000): Promise<Response> => {
     const controller = new AbortController();
@@ -347,7 +347,7 @@ export async function checkDetectionHealth(): Promise<{
       throw error;
     }
   };
-  
+
   // Check backend
   try {
     console.log('[Health] Checking backend:', `${API_BASE_URL}/api/health`);
@@ -357,7 +357,7 @@ export async function checkDetectionHealth(): Promise<{
   } catch (e) {
     console.log('[Health] Backend error:', e);
   }
-  
+
   // Check Python service
   try {
     console.log('[Health] Checking Python:', `${PYTHON_SERVICE_URL}/health`);
@@ -370,7 +370,7 @@ export async function checkDetectionHealth(): Promise<{
   } catch (e) {
     console.log('[Health] Python error:', e);
   }
-  
+
   console.log('[Health] Results:', results);
   return results;
 }

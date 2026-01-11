@@ -57,19 +57,20 @@ export function CameraViewComponent({
   const [isListening, setIsListening] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [lastFrameBase64, setLastFrameBase64] = useState<string | null>(null);
+  const [imageDimensions, setImageDimensions] = useState({ width: 640, height: 480 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const frameNumberRef = useRef(0); // Track frame number for motion detection
 
   // Get screen dimensions for bounding box calculations
   const screenDimensions = Dimensions.get("window");
-  
+
   // Get settings from store
   const { alertSettings, transportSettings } = useAppStore();
-  
+
   // Get the color profile for the user's colorblindness type
   const colorProfile = getColorProfile(colorblindType as any);
-  
+
   // Reset motion tracking when component unmounts or colorblind type changes
   useEffect(() => {
     return () => {
@@ -110,10 +111,10 @@ export function CameraViewComponent({
       speak("I need to see something first. Please point the camera at what you want me to describe.");
       return;
     }
-    
+
     setAiResponse(null);
     speak("Let me take a look...");
-    
+
     try {
       const analysis = await analyzeScene(
         lastFrameBase64,
@@ -122,30 +123,30 @@ export function CameraViewComponent({
           transportMode: transportSettings.currentMode,
         }
       );
-      
+
       // Build response message
       let response = analysis.description;
-      
+
       // Add traffic signal info if present
       if (analysis.trafficSignals.length > 0) {
         response += ` Traffic signal: ${analysis.trafficSignals.join(', ')}.`;
       }
-      
+
       // Add hazard warnings
       if (analysis.hazards.length > 0) {
         response += ` Caution: ${analysis.hazards.join(', ')}.`;
       }
-      
+
       // Add color warnings for colorblind users
       if (analysis.colorWarnings.length > 0 && colorblindType !== 'normal') {
         response += ` Note: ${analysis.colorWarnings.join('. ')}.`;
       }
-      
+
       // Add suggested action
       response += ` ${analysis.suggestedAction}`;
-      
+
       setAiResponse(response);
-      
+
       // Use ElevenLabs for AI responses if enabled
       if (colorProfile.useElevenLabs) {
         await speakWithElevenLabs(response);
@@ -163,12 +164,12 @@ export function CameraViewComponent({
     if (currentState === 'unknown') {
       speak("No traffic signal detected. Point the camera at a traffic light.");
     } else {
-      const message = currentState === 'red' 
-        ? "Red light. Stop." 
+      const message = currentState === 'red'
+        ? "Red light. Stop."
         : currentState === 'yellow'
-        ? "Yellow light. Prepare to stop."
-        : "Green light. You may proceed.";
-      
+          ? "Yellow light. Prepare to stop."
+          : "Green light. You may proceed.";
+
       if (colorProfile.useElevenLabs) {
         speakWithElevenLabs(message);
       } else {
@@ -188,7 +189,7 @@ export function CameraViewComponent({
       console.log('[CameraView] 📸 Taking snapshot...');
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.7,  // Higher quality for better detection
+        quality: 0.5,  // Fast capture for high FPS
         skipProcessing: true,
         shutterSound: false,
       });
@@ -214,25 +215,33 @@ export function CameraViewComponent({
       // Update state
       setCurrentState(result.state);
       setConfidence(result.confidence);
-      
+
+      // Update image dimensions from result if available
+      if (result.imageWidth && result.imageHeight) {
+        setImageDimensions({
+          width: result.imageWidth,
+          height: result.imageHeight
+        });
+      }
+
       // Update detected objects for bounding box overlay with motion tracking
       if (result.detectedObjects && result.detectedObjects.length > 0) {
-        console.log(`[CameraView] Objects detected:`, result.detectedObjects.map(o => `${o.label} (${Math.round(o.confidence*100)}%)`));
+        console.log(`[CameraView] Objects detected:`, result.detectedObjects.map(o => `${o.label} (${Math.round(o.confidence * 100)}%)`));
         // Apply motion tracking to identify moving objects
         frameNumberRef.current++;
         const trackedObjects = updateMotionTracking(result.detectedObjects, frameNumberRef.current);
         setDetectedObjects(trackedObjects);
-        
+
         // VOICE ALERTS: Only speak for objects with problematic colors
         // This is the ONLY place voice alerts should trigger in the app
         const problematicObjects = result.detectedObjects.filter(
           obj => obj.isProblematicColor && obj.alertPriority !== 'none'
         );
-        
+
         if (problematicObjects.length > 0 && result.confidence >= alertSettings.minConfidenceToAlert) {
           // Generate alert message for problematic colors
           const alertMessage = generateColorAlert(problematicObjects);
-          
+
           try {
             // Use ElevenLabs for more natural voice
             await speakWithElevenLabs(alertMessage);
@@ -263,7 +272,7 @@ export function CameraViewComponent({
     alertSettings.minConfidenceToAlert,
     alertSettings.positionCuesEnabled,
   ]);
-  
+
   // Generate descriptive alert for objects with problematic colors
   const generateColorAlert = (objects: DetectedObject[]): string => {
     // Sort by priority - critical first
@@ -271,18 +280,18 @@ export function CameraViewComponent({
       const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
       return (priorityOrder[a.alertPriority] || 4) - (priorityOrder[b.alertPriority] || 4);
     });
-    
+
     const topObject = sorted[0];
-    
+
     // Use color warning if available, otherwise generate from label and colors
     if (topObject.colorWarning) {
       return topObject.colorWarning;
     }
-    
+
     // Generate alert based on detected colors
     const colors = topObject.colors?.join(', ') || 'colored';
     const label = topObject.label || topObject.class || 'object';
-    
+
     // Specific alerts for known objects
     if (label.toLowerCase().includes('traffic light') || label.toLowerCase().includes('signal')) {
       const color = topObject.colors?.[0] || 'unknown';
@@ -294,18 +303,18 @@ export function CameraViewComponent({
         return "Green light. You may go.";
       }
     }
-    
+
     if (label.toLowerCase().includes('stop sign')) {
       return "Stop sign ahead. Come to a complete stop.";
     }
-    
+
     if (label.toLowerCase().includes('car') || label.toLowerCase().includes('vehicle')) {
       const color = topObject.colors?.[0] || '';
       if (color.toLowerCase().includes('red')) {
         return "Brake lights ahead. Slow down.";
       }
     }
-    
+
     // Generic alert for other objects
     return `${colors} ${label} detected ahead.`;
   };
@@ -324,19 +333,19 @@ export function CameraViewComponent({
       }
     };
   }, [permission?.granted, captureFrame, frameInterval]);
-  
+
   // Auto-lock on highest priority target (moving objects or threats)
   useEffect(() => {
     if (detectedObjects.length === 0) {
       setActiveTargetIndex(0);
       return;
     }
-    
+
     // Calculate priority score for each object
     // Priority order: Moving objects > Critical alerts > High alerts > Medium alerts > Others
     const getPriorityScore = (obj: TrackedObject): number => {
       let score = 0;
-      
+
       // Moving objects get highest priority
       if (obj.isMoving) {
         score += 1000;
@@ -344,7 +353,7 @@ export function CameraViewComponent({
         const velocityMag = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
         score += velocityMag * 10;
       }
-      
+
       // Alert priority scoring
       const priorityOrder: Record<string, number> = {
         critical: 500,
@@ -354,22 +363,22 @@ export function CameraViewComponent({
         none: 0,
       };
       score += priorityOrder[obj.alertPriority] || 0;
-      
+
       // Problematic colors get bonus
       if (obj.isProblematicColor) {
         score += 100;
       }
-      
+
       // Confidence bonus
       score += obj.confidence * 10;
-      
+
       return score;
     };
-    
+
     // Find the highest priority target
     let bestIndex = 0;
     let bestScore = getPriorityScore(detectedObjects[0]);
-    
+
     for (let i = 1; i < detectedObjects.length; i++) {
       const score = getPriorityScore(detectedObjects[i]);
       if (score > bestScore) {
@@ -377,7 +386,7 @@ export function CameraViewComponent({
         bestIndex = i;
       }
     }
-    
+
     setActiveTargetIndex(bestIndex);
   }, [detectedObjects]);
 
@@ -468,9 +477,9 @@ export function CameraViewComponent({
   return (
     <View style={styles.container}>
       {/* Camera preview - full screen for dashcam mode */}
-      <ExpoCameraView 
-        ref={cameraRef} 
-        style={styles.camera} 
+      <ExpoCameraView
+        ref={cameraRef}
+        style={styles.camera}
         facing="back"
         flash="off"
         enableTorch={false}
@@ -478,14 +487,13 @@ export function CameraViewComponent({
         {/* Bounding box overlay for detected objects with auto-targeting */}
         <BoundingBoxOverlay
           objects={detectedObjects}
-          imageWidth={640}
-          imageHeight={480}
+          imageWidth={imageDimensions.width}
+          imageHeight={imageDimensions.height}
           containerWidth={screenDimensions.width}
           containerHeight={screenDimensions.height}
           activeTargetIndex={activeTargetIndex}
-          colorblindType={colorblindType as ColorblindnessType}
         />
-        
+
         {/* Minimal HUD overlay - only show when signal detected */}
         {currentState !== "unknown" && (
           <View style={styles.hudOverlay}>
@@ -523,7 +531,7 @@ export function CameraViewComponent({
             />
           </View>
         )}
-        
+
         {/* Object count - minimal badge */}
         {detectedObjects.length > 0 && (
           <View style={styles.objectCountBadge}>
@@ -532,12 +540,12 @@ export function CameraViewComponent({
             </Text>
           </View>
         )}
-        
+
         {/* AI Response overlay */}
         {aiResponse && (
           <View style={styles.aiResponseOverlay}>
             <Text style={styles.aiResponseText}>{aiResponse}</Text>
-            <Pressable 
+            <Pressable
               style={styles.dismissButton}
               onPress={() => setAiResponse(null)}
             >
@@ -551,8 +559,8 @@ export function CameraViewComponent({
       <View style={styles.controlOverlay}>
         <View style={styles.lockOnIndicator}>
           <Text style={styles.lockOnText}>
-            {detectedObjects.length > 0 
-              ? `◎ ${activeTargetIndex + 1}/${detectedObjects.length}` 
+            {detectedObjects.length > 0
+              ? `◎ ${activeTargetIndex + 1}/${detectedObjects.length}`
               : "○ SCANNING"}
           </Text>
         </View>
