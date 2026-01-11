@@ -68,6 +68,8 @@ export type SignalState = "red" | "yellow" | "green" | "flashing" | "unknown";
  * We support the three main types of color vision deficiency:
  * - Protanopia: Red-blind (difficulty distinguishing red)
  * - Deuteranopia: Green-blind (difficulty distinguishing green)
+ * - Protanomaly: Red-weak (reduced sensitivity to red)
+ * - Deuteranomaly: Green-weak (reduced sensitivity to green)
  * - Tritanopia: Blue-blind (rare, difficulty with blue/yellow)
  * - Normal: No color vision deficiency
  * - Low Vision: General low vision, relies primarily on audio
@@ -75,7 +77,9 @@ export type SignalState = "red" | "yellow" | "green" | "flashing" | "unknown";
 export type ColorblindnessType =
   | "normal"
   | "protanopia" // Red-blind
+  | "protanomaly" // Red-weak
   | "deuteranopia" // Green-blind
+  | "deuteranomaly" // Green-weak
   | "tritanopia" // Blue-yellow blind
   | "low_vision" // Relies on audio
   | "unknown";
@@ -92,7 +96,9 @@ export const getSignalMessage = (
 ): string => {
   const needsPositionCues =
     colorblindType === "protanopia" ||
+    colorblindType === "protanomaly" ||
     colorblindType === "deuteranopia" ||
+    colorblindType === "deuteranomaly" ||
     colorblindType === "low_vision";
 
   const messages: Record<SignalState, { standard: string; enhanced: string }> =
@@ -130,7 +136,9 @@ export const getSignalMessage = (
 export const getColorblindAdjustments = (type: ColorblindnessType) => {
   switch (type) {
     case "protanopia":
+    case "protanomaly":
     case "deuteranopia":
+    case "deuteranomaly":
       // For red-green colorblindness: use patterns/shapes in addition to color
       return {
         usePatterns: true,

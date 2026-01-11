@@ -225,6 +225,70 @@ export const COLOR_PROFILES: Record<ColorblindnessType, ColorProfile> = {
     useElevenLabs: true,
   },
 
+  protanomaly: {
+    type: 'protanomaly',
+    name: 'Protanomaly (Red-Weak)',
+    description: 'Reduced sensitivity to red colors',
+    problematicColors: ['red', 'orange', 'pink'],
+    detectColors: [
+      {
+        name: 'red',
+        hsvMin: [0, 70, 50],
+        hsvMax: [10, 255, 255],
+        alertPriority: 'critical',
+      },
+      {
+        name: 'red-high',
+        hsvMin: [170, 70, 50],
+        hsvMax: [180, 255, 255],
+        alertPriority: 'critical',
+      },
+      {
+        name: 'orange',
+        hsvMin: [10, 70, 50],
+        hsvMax: [25, 255, 255],
+        alertPriority: 'high',
+      },
+    ],
+    priorityObjects: [
+      'red_light',
+      'stop_sign',
+      'brake_light',
+      'emergency_vehicle',
+      'fire_truck',
+      'warning_sign',
+    ],
+    useElevenLabs: true,
+  },
+
+  deuteranomaly: {
+    type: 'deuteranomaly',
+    name: 'Deuteranomaly (Green-Weak)',
+    description: 'Reduced sensitivity to green colors',
+    problematicColors: ['green', 'yellow-green'],
+    detectColors: [
+      {
+        name: 'green',
+        hsvMin: [35, 70, 50],
+        hsvMax: [85, 255, 255],
+        alertPriority: 'critical',
+      },
+      {
+        name: 'yellow-green',
+        hsvMin: [25, 70, 50],
+        hsvMax: [35, 255, 255],
+        alertPriority: 'high',
+      },
+    ],
+    priorityObjects: [
+      'green_light',
+      'pedestrian_signal_go',
+      'school_zone',
+      'crosswalk',
+    ],
+    useElevenLabs: true,
+  },
+
   tritanopia: {
     type: 'tritanopia',
     name: 'Tritanopia (Blue-Yellow Blind)',

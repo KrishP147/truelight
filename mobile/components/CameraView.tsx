@@ -10,6 +10,7 @@
  * - ElevenLabs voice for color-related alerts only
  * - Voice commands with AI assistant (Sierra)
  * - Hands-free interaction
+ * - Motion tracking for moving objects (animated brackets)
  */
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
@@ -33,6 +34,7 @@ import { BoundingBoxOverlay } from "./BoundingBoxOverlay";
 import { getColorProfile, DETECTABLE_OBJECTS, DetectableObject } from "../constants/colorProfiles";
 import { parseVoiceCommand, executeVoiceCommand, VoiceCommand } from "../services/voiceCommands";
 import { analyzeScene, askQuestion, getGreeting, SceneAnalysis } from "../services/aiAssistant";
+import { updateMotionTracking, TrackedObject, resetMotionTracking } from "../services/motionTracking";
 
 interface Props {
   colorblindType: ColorBlindnessType;
@@ -51,12 +53,13 @@ export function CameraViewComponent({
   const [currentState, setCurrentState] = useState<SignalState>("unknown");
   const [confidence, setConfidence] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
+  const [detectedObjects, setDetectedObjects] = useState<TrackedObject[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [lastFrameBase64, setLastFrameBase64] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const frameNumberRef = useRef(0); // Track frame number for motion detection
 
   // Get screen dimensions for bounding box calculations
   const screenDimensions = Dimensions.get("window");
@@ -66,6 +69,13 @@ export function CameraViewComponent({
   
   // Get the color profile for the user's colorblindness type
   const colorProfile = getColorProfile(colorblindType as any);
+  
+  // Reset motion tracking when component unmounts or colorblind type changes
+  useEffect(() => {
+    return () => {
+      resetMotionTracking();
+    };
+  }, [colorblindType]);
 
   // Calculate frame interval based on transport mode
   const frameInterval =
@@ -199,9 +209,12 @@ export function CameraViewComponent({
       setCurrentState(result.state);
       setConfidence(result.confidence);
       
-      // Update detected objects for bounding box overlay
-      if (result.detectedObjects) {
-        setDetectedObjects(result.detectedObjects);
+      // Update detected objects for bounding box overlay with motion tracking
+      if (result.detectedObjects && result.detectedObjects.length > 0) {
+        // Apply motion tracking to identify moving objects
+        frameNumberRef.current++;
+        const trackedObjects = updateMotionTracking(result.detectedObjects, frameNumberRef.current);
+        setDetectedObjects(trackedObjects);
       } else {
         setDetectedObjects([]);
       }
