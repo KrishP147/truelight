@@ -1,8 +1,8 @@
-# TrueLight
+# ColourGuard
 
 Devpost Link: https://devpost.com/software/truelight
 
-TrueLight is a mobile dashcam app designed to help people with color vision deficiency navigate safely. It uses real-time object detection to identify objects in the camera feed, analyzes their colors, and provides audio alerts when it detects something that might be difficult for the user to see based on their specific type of colorblindness.
+ColourGuard is a mobile dashcam app designed to help people with color vision deficiency navigate safely. It uses real-time object detection to identify objects in the camera feed, analyzes their colors, and provides audio alerts when it detects something that might be difficult for the user to see based on their specific type of colorblindness.
 
 The app runs object detection using YOLOv3-tiny through a Python backend, with a React Native frontend built on Expo. When objects are detected, the app checks if their colors fall within the user's problematic color range and announces them via text-to-speech. For users with low vision, alerts are prioritized by proximity rather than color.
 
